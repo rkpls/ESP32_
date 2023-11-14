@@ -101,7 +101,6 @@ while Board_Status == 1:
         #send_data()
         
         time.sleep(0.2)                       #program delay
-        print(f{})
 while Board_Status >= 2:
     power = 0
     set_motor_speed()
