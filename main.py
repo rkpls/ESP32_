@@ -22,7 +22,7 @@ power = 0
 Boot_Switch = machine.Pin(0, machine.Pin.IN)
 Board_LED = machine.Pin(2, machine.Pin.OUT)
 
-Pin19 = machine.Pin(19, machine.Pin.IN, machine.Pin.PULL_UP)
+Pin19 = machine.Pin(19, machine.Pin.IN, machine.Pin.PULL_DOWN)
 
 p22 = machine.Pin(22)
 pwm22 = machine.PWM(p22)
@@ -51,12 +51,10 @@ def set_motor_speed():
         pwm23.freq(pwm_freq)
         duty = int(duty)                                    #make integer
         pwm23.duty(duty)
-        time.sleep(0.2)
     elif duty < -255:                                       #rückwärts min 25%
         pwm22.freq(pwm_freq)
         duty = int(duty*-1)
         pwm22.duty(duty)
-        time.sleep(0.2)
     else:                                                   #motor aus
         pwm23.duty(0)
         pwm22.duty(0)
@@ -72,12 +70,8 @@ def LED_blink():
 # ---------- INTERRUPT ----------
 
 Boot_Switch.irq(trigger=machine.Pin.IRQ_FALLING, handler=interrupt_manual)
-Pin19.irq(trigger=machine.Pin.IRQ_RISING, handler=interrupt_rev_counter)
 
-# ---------- WIFI ----------
-
-def send_data():
-    pass
+# ---------- WIFI+DATA ----------
 
 # ---------- LOOP ----------
 
