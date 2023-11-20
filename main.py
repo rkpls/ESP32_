@@ -1,7 +1,7 @@
-
 import time
 import machine
 import network
+import usocket as socket
 
 # ---------- VAR ----------
 
@@ -9,94 +9,112 @@ Board_Status = 0
 
 pwm_freq = 200
 
-rev_counter = 0
-revs_sec = 0
-min_rpm_sample_time = 2000
-timer = 0
-delay = 0
+last_request_time = 0
+delay_btwn_request = 0.2
 
+data = 0
 power = 0
+duty = 0
+
+html_content = ""
+terminal_log = 0
 
 # ---------- PIN ----------
 
-Boot_Switch = machine.Pin(0, machine.Pin.IN)
-Board_LED = machine.Pin(2, machine.Pin.OUT)
+Board_LED = machine.Pin(38, machine.Pin.OUT)
 
-Pin19 = machine.Pin(19, machine.Pin.IN, machine.Pin.PULL_DOWN)
-
-p22 = machine.Pin(22)
-pwm22 = machine.PWM(p22)
-p23 = machine.Pin(23)
-pwm23 = machine.PWM(p23)
+p16 = machine.Pin(16)
+pwm16 = machine.PWM(p16)
+p17 = machine.Pin(17)
+pwm17 = machine.PWM(p17)
 
 # ---------- DEF ----------
 
-def interrupt_manual(Boot_Switch):
-    global Board_Status
-    Board_Status += 1
-    print(f"Board Status: {Board_Status}")
+# ---------- WIFI+DATA ----------
+
 def connect():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
-        wlan.connect('Zenbook-14-Pals','Micropython')
+        wlan.connect('Zenbook-14-Pals', 'Micropython')  # Network intel
     else:
         pass
-    print("Netzwerk: ", wlan.ifconfig)
+    sta_if = network.WLAN(network.STA_IF)
+    print('IP:', sta_if.ifconfig()[0])  # output IP
+
+def html():
+    html_content = ""
+    with open('index.html', 'r') as f:
+        html_content = f.read()
+    return html_content
+
+def handle_post_request(request):
+    global data
+    data_start = request.find(b'\r\n\r\n') + 4
+    data = request[data_start:].decode()
+    current_time = time.time()
+    if current_time - last_request_time < delay_btwn_request:
+        return
+
+def server():
+    global serv
+    serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    serv.bind(('', 80))
+    serv.listen(5)
+
+def server_loop():
+    global serv
+    conn, addr = serv.accept()
+    request = conn.recv(1024)
+    if b'GET / ' in request:
+        response = 'HTTP/1.1 200 OK\nContent-Type: text/html\n\n' + html()
+    elif b'POST /submit' in request:
+        handle_post_request(request)
+        response = 'HTTP/1.1 200 OK\nContent-Type: text/html\n\n' + html()
+    else:
+        response = 'HTTP/1.1 404 Not Found\nContent-Type: text/plain\n\nNot Found'
+    conn.send(response)
+    conn.close()
+
+# ---------- MOTOR ----------
+
 def set_motor_speed():
-    global power
-    global duty
-    duty = power / 100 * 1023                               #power reqest to in Hz
-    if duty > 255:                                          #vorwärts min 25%
-        pwm23.freq(pwm_freq)
-        duty = int(duty)                                    #make integer
-        pwm23.duty(duty)
-    elif duty < -255:                                       #rückwärts min 25%
-        pwm22.freq(pwm_freq)
-        duty = int(duty*-1)
-        pwm22.duty(duty)
-    else:                                                   #motor aus
-        pwm23.duty(0)
-        pwm22.duty(0)
-def interrupt_rev_counter(Pin19):
-    global rev_counter
-    rev_counter += 1
-def LED_blink():
-    Board_LED(1)
-    time.sleep(0.2)
-    Board_LED(0)
-    time.sleep(0.2)    
+    global power, duty
+    duty = power / 100 * 1023  # power request to in Hz
+    if duty > 255:  # vorwärts min 25%
+        pwm17.duty(0)
+        pwm16.freq(pwm_freq)
+        duty = int(duty)  # make integer
+        pwm16.duty(duty)
+    elif duty < -255:  # rückwärts min 25%
+        pwm16.duty(0)
+        pwm17.freq(pwm_freq)
+        duty = int(duty * -1)
+        pwm17.duty(duty)
+    else:  # motor aus
+        pwm16.duty(0)
+        pwm17.duty(0)
 
 # ---------- INTERRUPT ----------
 
-Boot_Switch.irq(trigger=machine.Pin.IRQ_FALLING, handler=interrupt_manual)
+# ---------- RESET ----------
 
-# ---------- WIFI+DATA ----------
+# ----------- SETUP -----------
+connect()
+print("MAIN")
+html()
+server()
+power = 0
+pwm16.duty(0)
+pwm17.duty(0)
 
 # ---------- LOOP ----------
 
-pwm23.duty(0)
-pwm22.duty(0)
-
-while Board_Status == 0:
-    print("startup")
-    connect()
-    LED_blink()
-    Board_Status += 1
-        
-# ---------- RUN ----------
-
-while Board_Status == 1:
-    print(f"Borad Status: {Board_Status}: Run")
-    #power = int(input("Request Manual Power input "))
-    while True:
-        power = int(input())
-        set_motor_speed()
-        #send_data()
-        
-        time.sleep(0.2)                       #program delay
-while Board_Status >= 2:
-    power = 0
+while True:
+    server_loop()
+    power = int(data)
+    print(power)
     set_motor_speed()
-    print("idle")
-    time.sleep(5)
+
+
+
