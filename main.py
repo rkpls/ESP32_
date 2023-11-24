@@ -32,22 +32,6 @@ pwm17 = machine.PWM(p17)
 
 # ---------- WIFI+DATA ----------
 
-def connect():
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    if not wlan.isconnected():
-        wlan.connect('Zenbook-14-Pals', 'Micropython')  # Network intel
-    else:
-        pass
-    sta_if = network.WLAN(network.STA_IF)
-    print('IP:', sta_if.ifconfig()[0])  # output IP
-
-def html():
-    html_content = ""
-    with open('index.html', 'r') as f:
-        html_content = f.read()
-    return html_content
-
 def handle_post_request(request):
     global data
     data_start = request.find(b'\r\n\r\n') + 4
@@ -56,11 +40,6 @@ def handle_post_request(request):
     if current_time - last_request_time < delay_btwn_request:
         return
 
-def server():
-    global serv
-    serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    serv.bind(('', 80))
-    serv.listen(5)
 
 def server_loop():
     global serv
@@ -100,10 +79,8 @@ def set_motor_speed():
 # ---------- RESET ----------
 
 # ----------- SETUP -----------
-connect()
+
 print("MAIN")
-html()
-server()
 power = 0
 pwm16.duty(0)
 pwm17.duty(0)
