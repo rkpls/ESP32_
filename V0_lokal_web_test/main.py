@@ -1,62 +1,82 @@
 # ---------- LIBS ----------
-
 import asyncio
+import network
 import time
 import websocket
-import ujson
+import socket
+import sys
 import machine
 
-# ----------FUNCTIONS----------
+with open("index.html", "r") as html_file:
+    html_content = html_file.read()
 
-class TerminalLogger:
-    def __init__(self):
-        self.log = []
+# ---------- VAR ----------
+ssid = 'Zenfone_9'
+password = 'Micropython'
 
-    def write(self, message):
-        self.log.append((time.time(), message))
+standard_delay = 0.5
 
-# ----------SOCKET_THREAD----------
-async def task_socket(request, response):
-    websocket = await request.accept()
-    print("WebSocket connection established")
+log_data = []
+latest_log_data = str()
+last_request_time = time.time()  # Initialize last_request_time
 
+# ---------- FUNCTIONS ----------
+
+def collect_terminal_log(log_list):
+    global latest_log_data, log_data, last_request_time, standard_delay
+    current_time = time.time()
+    if current_time - last_request_time < standard_delay:
+        return
+    latest_log_data = f""
+    log_data.append(latest_log_data)
+    last_request_time = time.time()
+    send_data_web(latest_log_data)
+
+def data_bat_voltage():
+    pass
+
+def data_bat_current():
+    pass
+
+def data_rpm():
+    pass
+
+# ---------- DATA_TRANSFER ----------
+
+def read_data_web():
+    # Code to read data from the sensor
+    pass
+
+def send_data_web():
+    # Code to send data to the web server
+    pass
+
+# ---------- SOCKET_THREAD ----------
+def task_socket():
+    time.sleep(0.1)
     try:
+        addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(addr)
+        s.listen(1)
+        print("Server started on {}:{}".format(*addr))
         while True:
-            data = await websocket.recv()
-            if data is None:
-                break
-            # Simulate processing and send a response back
-            response_data = {"status": "OK", "message": f"Received: {data}"}
-            await websocket.send(ujson.dumps(response_data))
-    except websocket.WebSocketClosed:
-        print("WebSocket connection closed")
+            client_sock, client_addr = s.accept()
+            print("Request from:", client_addr)
+            # Read the HTTP request
+            request_data = client_sock.recv(1024)
+            request_str = request_data.decode("utf-8")
+            # Check if it's a GET request
+            if request_str.startswith("GET"):
+                # Send the HTTP response
+                response = 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' + html_content
+                client_sock.send(response.encode("utf-8"))
+            client_sock.close()
+    except Exception as e:
+        print("Error:", e)
+        sys.exit()
 
+# ---------- MAIN_THREAD ----------
 
-# ----------WEB_THREAD----------
-async def task_web(request, response):
-    if request.url == "/hyperloop":
-        # Simulate sending terminal log data as JSON
-        log_data = ["Log message 1", "Log message 2", "Log message 3"]
-        await response.send(ujson.dumps(log_data))
-    elif request.url == "/ws":
-        # Handle WebSocket connection
-        await task_socket(request, response)
-    else:
-        await response.send("404 Not Found")
-
-
-# ----------MAIN_THREAD----------
-async def task_main():
-    while True:
-        print("Task Main is running")
-        await asyncio.sleep(5)
-
-
-# ----------LOOP_MANAGE-----------
-loop = asyncio.get_event_loop()
-
-loop.create_task(task_socket)
-loop.create_task(task_web)
-loop.create_task(task_main)
-
-loop.run_forever()
+while True:
+    task_socket()

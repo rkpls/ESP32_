@@ -1,8 +1,9 @@
-#---------- LIBS ----------
 import network
 
-#---------- WIFI ----------
-def connect_wifi(ssid, password):
+ssid = 'Telekom_Pals'
+password = 'fck_afd!'
+
+def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
@@ -12,7 +13,5 @@ def connect_wifi(ssid, password):
             pass
     print('network config:', wlan.ifconfig())
 
-#---------- RUN ----------
-print("BOOT")
-connect_wifi('Zenfone_9', 'Micropython')
+connect_wifi()
 import main
