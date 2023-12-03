@@ -3,6 +3,9 @@ import machine
 import network
 import usocket as socket
 
+with open("index.html", "r") as html_file:
+    html_content = html_file.read()
+
 # ---------- VAR ----------
 
 Board_Status = 0
@@ -46,10 +49,10 @@ def server_loop():
     conn, addr = serv.accept()
     request = conn.recv(1024)
     if b'GET / ' in request:
-        response = 'HTTP/1.1 200 OK\nContent-Type: text/html\n\n' + html()
+        response = 'HTTP/1.1 200 OK\nContent-Type: text/html\n\n' + html_file()
     elif b'POST /submit' in request:
         handle_post_request(request)
-        response = 'HTTP/1.1 200 OK\nContent-Type: text/html\n\n' + html()
+        response = 'HTTP/1.1 200 OK\nContent-Type: text/html\n\n' + html_file()
     else:
         response = 'HTTP/1.1 404 Not Found\nContent-Type: text/plain\n\nNot Found'
     conn.send(response)

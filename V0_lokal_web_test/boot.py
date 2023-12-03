@@ -11,7 +11,6 @@ def connect_wifi():
         wlan.connect(ssid, password)
         while not wlan.isconnected():
             pass
-    print('network config:', wlan.ifconfig())
 
 connect_wifi()
 import main

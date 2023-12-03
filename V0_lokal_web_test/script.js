@@ -1,4 +1,3 @@
-
 document.getElementById("power_input").value = 0;
 
 function updateValue(value) {
