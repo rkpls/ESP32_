@@ -1,33 +1,39 @@
-import socket
-import uasyncio as asyncio
+# ---------- LIBS ----------
 
-async def run_server(ip, port):
-    loop = asyncio.get_event_loop()
+import asyncio
+import time
+import websocket
+import machine
 
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((ip, port))
-    server.listen(1)
+# ----------FUNCTIONS----------
 
+class TerminalLogger:
+    def __init__(self):
+        self.log = []
+
+    def write(self, message):
+        self.log.append((time.time(), message))
+
+# ----------WEB_THREAD----------
+async def task_web():
     while True:
-        client, addr = await loop.sock_accept(server)
-        print("Client connected")
-        loop.create_task(handle_client(client))
+        global
+        print(log)
+        terminal_logger = TerminalLogger()
+        sys.stdout = terminal_logger
+        current_time = time.time()
+        last_second_log = [(timestamp, message) for timestamp, message in terminal_logger.log if current_time - timestamp <= 1]
 
-async def handle_client(client):
-    loop = asyncio.get_event_loop()
-
+# ----------MAIN_THREAD----------
+async def task_main():
     while True:
-        data = await loop.sock_recv(client, 1024)
-        if not data:
-            break
-        process_data(data)
+        print("Task Main is running")
+        await asyncio.sleep(5)
 
-    print("Client disconnected")
-    client.close()
-
-def process_data(data):
-    # Handle the received data, e.g., execute a command, read a sensor, etc.
-    pass
-
+# ----------LOOP_MANAGE-----------
 loop = asyncio.get_event_loop()
-loop.run_until_complete(run_server('80.187.124.97', 81))
+
+loop.create_task(task_web())
+loop.create_task(task_main())
+
+loop.run_forever()
