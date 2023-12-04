@@ -1,7 +1,7 @@
 import network
 
-ssid = 'Telekom_Pals'
-password = 'fck_afd!'
+ssid = 'Zenbook-14-Pals'
+password = 'Micropython'
 
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)

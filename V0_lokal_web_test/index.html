@@ -4,25 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adler</title>
-    <link rel="stylesheet" href="css.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+            background-color: #333; /* Dark grey background */
+            color: white; /* White text */
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 80%; /* Set the width of the slider */
+            margin: 8px;
+        }
+    </style>
 </head>
 <body>
+    <h2>Power<h2>
+    <form id="integerForm">
+        <label for="powerInput">Power:</label>
+        <input type="range" id="integerInput" name="integerInput" min="-100" max="100" step="1" value="0" oninput="submitForm()">
+        <br>
+    </form>
 
-    <h1>Adler Interface</h1>
-    <p>
-        Input
-        <form action="/submit" method="post">
-            <label for="power_input">Power:</label>
-            <input type="range" id="power_input" name="power_input" min="-100" max="100" oninput="updateValue(this.value)" style="width: 400px;" required>
-            <br>
-            <span id="valueDisplay">0</span>
-        </form>
-    </p>
-    <p>
-        Output
-        <div id="log"></div>
-    </p>
+    <script>
+        let lastSentValue = 0;
+        const requestInterval = 2000; // Request interval in milliseconds (e.g., 2000 = 2 seconds)
 
-    <script src="script.js"></script>
+        function submitForm() {
+            var inputElement = document.getElementById("integerInput");
+            var inputValue = parseInt(inputElement.value);
+
+            // Limit the request rate
+            if (Math.abs(inputValue - lastSentValue) >= 1) {
+                sendData(inputValue);
+                lastSentValue = inputValue;
+            }
+        }
+
+        async function submit(value) {
+            try {
+                const response = await fetch(`/update?value=${value}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (response.ok) {
+                    console.log('Data sent successfully');
+                } else {
+                    console.error('Failed to send data');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    </script>
 </body>
 </html>
