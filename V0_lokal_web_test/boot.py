@@ -1,10 +1,6 @@
 import network
 
-<<<<<<< Updated upstream
 ssid = 'Zenbook-14-Pals'
-=======
-ssid = 'Zenfone_9'
->>>>>>> Stashed changes
 password = 'Micropython'
 
 def connect_wifi():
