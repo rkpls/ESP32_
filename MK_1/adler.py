@@ -95,8 +95,11 @@ def gyro():
     try:
         global g_force_x, g_force_y, g_force_z
         g_force_x = float(mpu6050.gyro.x)
+        g_force_x = g_force_x / 4069
         g_force_y = float(mpu6050.gyro.y)
+        g_force_y= g_force_y/ 4069    
         g_force_z = float(mpu6050.gyro.z)
+
         print(g_force_x, g_force_y, g_force_z)
     except:
         print("Could not read accelerometer")
