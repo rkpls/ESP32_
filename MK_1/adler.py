@@ -94,12 +94,12 @@ def wifi(ssid, password):
 def gyro():
     try:
         global g_force_x, g_force_y, g_force_z
-        g_force_x = float(mpu6050.gyro.x)
-        g_force_x = g_force_x / 4069
-        g_force_y = float(mpu6050.gyro.y)
-        g_force_y= g_force_y/ 4069    
-        g_force_z = float(mpu6050.gyro.z)
-
+        read_x = float(mpu6050.gyro.x)
+        g_force_x = read_x / 4069
+        read_y = float(mpu6050.gyro.y)
+        g_force_y = read_y/ 4069    
+        read_z = float(mpu6050.gyro.z)
+        g_force_z = read_z /4096
         print(g_force_x, g_force_y, g_force_z)
     except:
         print("Could not read accelerometer")
