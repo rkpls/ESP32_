@@ -2,15 +2,14 @@
 
 # ---------- LIBS ----------                           
 import machine                              #Pins and Stuff
-from machine import Pin, I2C                
+from machine import Pin, SPI, I2C                
 import time
-import asyncio                              #multitasking
-from asyncio import loop
+import uasyncio as asyncio                       #multitasking
 import gc                                   #RAM manager
 import network                              #wifi module
 import hcsr04 as HCSR04                     #distance sensor ----- install hcsr04.py
-import mpu6050 as MPU6050                   #G-Force Sensor ----- install mpu6050.py and vectro3d.py
-
+import mpu6050  as MPU6050                  #G-Force Sensor ----- install GY521.py and vectro3d.py
+import esp2in9bv2
 
 
 # ---------- CHANGABLE VARS ----------
@@ -32,51 +31,70 @@ pwm_freq = 1000                             #
 desired_motor_speed = 0                     #value for manual or calculated input (RPM)
 output = 0                                  #value useed by the PID controller
 current_motor_speed = 0                     #value for sensor reading (RPM)
-pid = PIDController(1.0, 0.1, 0.05, 1)      #values for kp, ki, kd, and setpoint
 
+#
 
 # ---------- PINS ----------
-i2c = I2C(scl=Pin(9), sda=Pin(8))                    # !!! I2C !!!
-mpu6050 = MPU6050(i2c)
 # --------------------------
 Motor_Pin_1 = machine.Pin(4)
 motor_pwm_1 = machine.PWM(Motor_Pin_1)
 Motor_Pin_2 = machine.Pin(5)
 motor_pwm_2 = machine.PWM(Motor_Pin_2)
 
-HCSR_sensor_1 = HCSR04(trigger_pin=6, echo_pin=7, echo_timeout_us=10000)
-HCSR_sensor_2 = HCSR04(trigger_pin=15, echo_pin=16, echo_timeout_us=10000)
+pin_trg1 = 15                                             # RTS 0 UART (Requiest to send) indicating to the receiver that it should be prepared to receive data.
+pin_echo1 = 16                                             # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
+pin_trg2 = 17                                             # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
+pin_echo2 = 18                                             # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
+                                                         # UART = Universal Asynchronous Receiver-Transmitter
+pin_SDA = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro
+#Pin_JTAG = 3                   # dont use (JTAG)
+#pin_LOG = 46                   # dont use (LOG)
+pin_SCL = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro
 
-RPM_sensor = machine.Pin(17, machine.Pin.IN)             #optocoupler read
+pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
+pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
+pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) not needed for display used as reset
+pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
+                                                         # SPI = Serial Peripheral Interface bus protocol
+pin_DC = 14
 
-#pin_18 = 18
-#pin_SDA = 8                                             # !!! I2C DATA BUS SDA !!! used for Gyro
-#Pin_JTAG = 3
-#pin_LOG = 46
-#pin_SCL = 9                                             # !!! I2C DATA BUS SCL !!! used for Gyro
-#pin_SS = 10
-#pin_MOSI = 11
-#pin_MISO = 12
-#pin_SCK = 13
-#pin_14 = 14
+Volts_Pin = machine.Pin(43, machine.Pin.IN)              #  TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
+Amps_Pin = machine.Pin(44, machine.Pin.IN)               #  TXD 0 UART // Amps 1 Amps = 100mV
 
-Volts_Pin = machine.Pin(43, machine.Pin.IN)               #Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
-Amps_Pin = machine.Pin(44, machine.Pin.IN)                #Amps 1 Amps = 100mV
-
-#pin_1 = 1
-#pin_2 = 2
-#pin_42 = 42
-#pin_41 = 41
-#pin_40 = 40
-#pin_39 = 39
+pin_1 = 1
+pin_2 = 2
+#pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
+#pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
+#pin_40 = 40                                                # MTDO (Master Test Data Output) JTAG
+#pin_39 = 39                                                # MTCK (Master Test Clock Signal) JTAG
 #pin_builtin_LED = machine.Pin(38, machine.Pin.OUT)
-#pin_37 = 37
-#pin_36 = 36
-#pin_35 = 35
+#pin_37 = 37                                                # USB OTG
+#pin_36 = 36                                                # USB OTG
+#pin_35 = 35                                                # USB OTG
 #pins: BOOT / VSPI / RGB_LED
 #pin_47 = 47
-#pin_21 = 21
+pin_busy = 21
 #PINS USB_1 / USB_2
+
+#display:
+#           SCK is the serial clock signal which will provide the pulses that move the individual bits of data.
+#           CS is the chip select signal which allows us to tell the Display when we are talking to it.
+#           DC is the Data / Command pin which we use to tell the Display if we are sending it a command instruction or actual data.
+#           RESET allows to send a hardware reset signal to the panel.
+
+# ---------- COMMS AND BUS SYSTEM SETUP ----------
+loop = asyncio.get_event_loop()
+
+spi = SPI(0, baudrate=400000, sck=Pin(pin_SCK), mosi=Pin(pin_MOSI))                             # !!! SPI !!!
+display = Display(spi, dc=Pin(pin_DC), cs=Pin(pin_CS), rst=Pin(pin_MISO), busy=Pin(pin_busy))   # e-paper
+
+
+i2c = I2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA))                                                   # !!! I2C !!!
+mpu6050 = MPU6050(i2c)                                                                          # gyro
+
+HCSR_sensor_1 = HCSR04(trigger_pin=pin_trg1, echo_pin=pin_echo1, echo_timeout_us=5000)          # HCSR 1 Top
+HCSR_sensor_2 = HCSR04(trigger_pin=pin_trg2, echo_pin=pin_echo2, echo_timeout_us=5000)          # HCSR 2 Front
+
 
 # ---------- FUNCTIONS ----------
 def wifi(ssid, password):
@@ -94,16 +112,47 @@ def wifi(ssid, password):
 def gyro():
     try:
         global g_force_x, g_force_y, g_force_z
-        read_x = float(mpu6050.gyro.x)
+        read_x = float(MPU6050.gyro.x)
         g_force_x = read_x / 4069
-        read_y = float(mpu6050.gyro.y)
+        read_y = float(MPU6050.gyro.y)
         g_force_y = read_y/ 4069    
-        read_z = float(mpu6050.gyro.z)
+        read_z = float(MPU6050.gyro.z)
         g_force_z = read_z /4096
         print(g_force_x, g_force_y, g_force_z)
     except:
         print("Could not read accelerometer")
 
+
+def test_display():
+
+    display.draw_rectangle(0, 0, 63, 63)
+    display.fill_rectangle(5, 5, 53, 53, red=True)
+
+    display.fill_circle(96, 32, 31)
+    display.draw_circle(96, 32, 26, invert=True)
+
+    coords = [[0, 106], [60, 106], [11, 70], [30, 128], [49, 70], [0, 106]]
+    display.draw_lines(coords)
+
+    display.fill_ellipse(96, 102, 30, 16)
+    display.draw_ellipse(96, 102, 16, 30, red=True)
+
+    display.draw_polygon(3, 32, 167, 30, red=True)
+    display.fill_polygon(4, 96, 167, 30)
+    display.draw_polygon(5, 32, 232, 30)
+    display.fill_polygon(6, 96, 232, 30, red=True)
+
+    display.draw_hline(0, 270, 128)
+    display.draw_vline(64, 270, 25)
+    display.draw_line(64, 295, 127, 270, red=True)
+    display.draw_line(64, 295, 0, 270, red=True)
+
+    display.present()
+
+    time.sleep(10)
+    display.clear()
+    display.sleep()
+    print('Done.')
 
 def read_desired_motor_speed():
     global desired_motor_speed
@@ -164,22 +213,22 @@ async def task_socket():
 
 # ---------- DATA MANAGE ----------
 async def task_monitor():                       # ---- TESTING! MAY NOT WORK ----
-    mpu6050.accel_range(2)                      #max G: +-8
-    mpu6050.accel_filter_range(3)               #filters vibrations averages every 11.8ms
+    MPU6050.accel_range(2)                      #max G: +-8
+    MPU6050.accel_filter_range(3)               #filters vibrations averages every 11.8ms
     while True:
         gyro()
-
 
 # ---------- MAIN CONTROL ----------
 async def task_main():
     while True:
-        read_desired_motor_speed()
-        read_current_motor_spped()
-        measurement = current_motor_speed()        #Read your measurement here
-        dt = time.time() - last_time            #Calculate the time difference
-        output = pid.update(measurement, dt)
-        set_motor_speed(output)                 #use the calculatet output variable as power in set_motor_speed
-        last_time = time.time()
+        #read_desired_motor_speed()
+        #read_current_motor_spped()
+        #measurement = current_motor_speed()        #Read your measurement here
+        #dt = time.time() - last_time            #Calculate the time difference
+        #output = pid.update(measurement, dt)
+        #set_motor_speed(output)                 #use the calculatet output variable as power in set_motor_speed
+        #last_time = time.time()
+        pass
 
 # ---------- MULTI ----------
 gc.enable()                                     #enable auto RAM Manager
@@ -188,6 +237,9 @@ while not wlan.isconnected():
         wifi(ssid, password)                            #connect to wifi
     except:
         print("could not find a WIFI")
+
+
+test_display()
 
 try:
     loop.create_task(task_socket())             #start loop web
