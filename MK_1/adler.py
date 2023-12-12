@@ -1,15 +1,15 @@
 
 
-# ---------- LIBS ----------                           
-import machine                              #Pins and Stuff
-from machine import Pin, SPI, I2C                
-import time
-import uasyncio as asyncio                       #multitasking
+# ---------- LIBS ----------
+import gc
+from machine import Pin, SPI, I2C, time_pulse_us            
+from utime import sleep_us
+import uasyncio as asyncio                  #multitasking
 import gc                                   #RAM manager
 import network                              #wifi module
 import hcsr04 as HCSR04                     #distance sensor ----- install hcsr04.py
 import mpu6050  as MPU6050                  #G-Force Sensor ----- install GY521.py and vectro3d.py
-import esp2in9bv2
+import esp2in9bv2 as esp2in9bv2
 
 
 # ---------- CHANGABLE VARS ----------
@@ -123,35 +123,16 @@ def gyro():
         print("Could not read accelerometer")
 
 
+def distance_meaasurement(self):
+    self.trigger.value(0)
+    sleep_us(5)
+    self.trigger.value(1)
+    sleep_us(10)
+    
+    dist = pulse_time = time_pulse_us(self.echo, 1, self.echo_timeout_us)
+    return dist
+
 def test_display():
-
-    display.draw_rectangle(0, 0, 63, 63)
-    display.fill_rectangle(5, 5, 53, 53, red=True)
-
-    display.fill_circle(96, 32, 31)
-    display.draw_circle(96, 32, 26, invert=True)
-
-    coords = [[0, 106], [60, 106], [11, 70], [30, 128], [49, 70], [0, 106]]
-    display.draw_lines(coords)
-
-    display.fill_ellipse(96, 102, 30, 16)
-    display.draw_ellipse(96, 102, 16, 30, red=True)
-
-    display.draw_polygon(3, 32, 167, 30, red=True)
-    display.fill_polygon(4, 96, 167, 30)
-    display.draw_polygon(5, 32, 232, 30)
-    display.fill_polygon(6, 96, 232, 30, red=True)
-
-    display.draw_hline(0, 270, 128)
-    display.draw_vline(64, 270, 25)
-    display.draw_line(64, 295, 127, 270, red=True)
-    display.draw_line(64, 295, 0, 270, red=True)
-
-    display.present()
-
-    time.sleep(10)
-    display.clear()
-    display.sleep()
     print('Done.')
 
 def read_desired_motor_speed():
