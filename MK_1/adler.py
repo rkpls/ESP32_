@@ -2,18 +2,15 @@
 
 # ---------- LIBS ----------
 import gc
-from machine import Pin, SPI, I2C, time_pulse_us            
+from machine import Pin, PWM, SPI, I2C, time_pulse_us            
 from utime import sleep_us
 import uasyncio as asyncio                  #multitasking
 import gc                                   #RAM manager
 import network                              #wifi module
 import hcsr04 as HCSR04                     #distance sensor ----- install hcsr04.py
 import mpu6050  as MPU6050                  #G-Force Sensor ----- install GY521.py and vectro3d.py
-<<<<<<< Updated upstream
 import esp2in9bv2 as esp2in9bv2
-=======
 from esp2in9bv2 import Display
->>>>>>> Stashed changes
 
 
 # ---------- CHANGABLE VARS ----------
@@ -40,20 +37,20 @@ current_motor_speed = 0                     #value for sensor reading (RPM)
 
 # ---------- PINS ----------
 # --------------------------
-Motor_Pin_1 = machine.Pin(4)
-motor_pwm_1 = machine.PWM(Motor_Pin_1)
-Motor_Pin_2 = machine.Pin(5)
-motor_pwm_2 = machine.PWM(Motor_Pin_2)
+Motor_Pin_1 = Pin(4)
+motor_pwm_1 = PWM(Motor_Pin_1)
+Motor_Pin_2 = Pin(5)
+motor_pwm_2 = PWM(Motor_Pin_2)
 
-pin_trg1 = 15                                             # RTS 0 UART (Requiest to send) indicating to the receiver that it should be prepared to receive data.
-pin_echo1 = 16                                             # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
-pin_trg2 = 17                                             # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
-pin_echo2 = 18                                             # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
+pin_SDA1 = 15                                             # RTS 0 UART (Requiest to send) indicating to the receiver that it should be prepared to receive data.
+pin_SCL1 = 16                                             # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
+pin_SDA2 = 17                                             # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
+pin_SCL2 = 18                                             # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
                                                          # UART = Universal Asynchronous Receiver-Transmitter
-pin_SDA = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro
+pin_SDA0 = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro 
 #Pin_JTAG = 3                   # dont use (JTAG)
 #pin_LOG = 46                   # dont use (LOG)
-pin_SCL = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro
+pin_SCL = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
 
 pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
 pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
@@ -62,8 +59,8 @@ pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/S
                                                          # SPI = Serial Peripheral Interface bus protocol
 pin_DC = 14
 
-Volts_Pin = machine.Pin(43, machine.Pin.IN)              #  TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
-Amps_Pin = machine.Pin(44, machine.Pin.IN)               #  TXD 0 UART // Amps 1 Amps = 100mV
+Volts_Pin = Pin(43, Pin.IN)              #  TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
+Amps_Pin = Pin(44, Pin.IN)               #  TXD 0 UART // Amps 1 Amps = 100mV
 
 pin_1 = 1
 pin_2 = 2
@@ -128,8 +125,6 @@ def gyro():
     except:
         print("Could not read accelerometer")
 
-<<<<<<< Updated upstream
-
 def distance_meaasurement(self):
     self.trigger.value(0)
     sleep_us(5)
@@ -141,10 +136,9 @@ def distance_meaasurement(self):
 
 def test_display():
     print('Done.')
-=======
+
 def display_qr():
     pass
->>>>>>> Stashed changes
 
 def read_desired_motor_speed():
     global desired_motor_speed
