@@ -9,7 +9,11 @@ import gc                                   #RAM manager
 import network                              #wifi module
 import hcsr04 as HCSR04                     #distance sensor ----- install hcsr04.py
 import mpu6050  as MPU6050                  #G-Force Sensor ----- install GY521.py and vectro3d.py
+<<<<<<< Updated upstream
 import esp2in9bv2 as esp2in9bv2
+=======
+from esp2in9bv2 import Display
+>>>>>>> Stashed changes
 
 
 # ---------- CHANGABLE VARS ----------
@@ -53,7 +57,7 @@ pin_SCL = 9                                             # !!!! I2C DATA BUS SCL 
 
 pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
 pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
-pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) not needed for display used as reset
+pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
 pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
                                                          # SPI = Serial Peripheral Interface bus protocol
 pin_DC = 14
@@ -72,7 +76,7 @@ pin_2 = 2
 #pin_36 = 36                                                # USB OTG
 #pin_35 = 35                                                # USB OTG
 #pins: BOOT / VSPI / RGB_LED
-#pin_47 = 47
+pin_rst = 47
 pin_busy = 21
 #PINS USB_1 / USB_2
 
@@ -85,9 +89,11 @@ pin_busy = 21
 # ---------- COMMS AND BUS SYSTEM SETUP ----------
 loop = asyncio.get_event_loop()
 
-spi = SPI(0, baudrate=400000, sck=Pin(pin_SCK), mosi=Pin(pin_MOSI))                             # !!! SPI !!!
-display = Display(spi, dc=Pin(pin_DC), cs=Pin(pin_CS), rst=Pin(pin_MISO), busy=Pin(pin_busy))   # e-paper
-
+try:
+    spi = SPI(0, baudrate=4000000, sck=Pin(pin_SCK), mosi=Pin(pin_MOSI), miso=Pin(pin_MISO))         # !!! SPI !!!
+    display = Display(spi, dc=Pin(pin_DC), cs=Pin(pin_CS), rst=Pin(pin_rst), busy=Pin(pin_busy))   # e-paper
+except:
+    print("no SPI")
 
 i2c = I2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA))                                                   # !!! I2C !!!
 mpu6050 = MPU6050(i2c)                                                                          # gyro
@@ -122,6 +128,7 @@ def gyro():
     except:
         print("Could not read accelerometer")
 
+<<<<<<< Updated upstream
 
 def distance_meaasurement(self):
     self.trigger.value(0)
@@ -134,6 +141,10 @@ def distance_meaasurement(self):
 
 def test_display():
     print('Done.')
+=======
+def display_qr():
+    pass
+>>>>>>> Stashed changes
 
 def read_desired_motor_speed():
     global desired_motor_speed
@@ -219,8 +230,7 @@ while not wlan.isconnected():
     except:
         print("could not find a WIFI")
 
-
-test_display()
+display_qr()
 
 try:
     loop.create_task(task_socket())             #start loop web
