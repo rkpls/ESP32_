@@ -1,6 +1,5 @@
 import machine
 from machine import Pin, PWM, SoftI2C
-import uasyncio as asyncio
 from time import sleep_ms
 from imu import MPU6050
 from vl53l0x import VL53L0X
@@ -34,8 +33,6 @@ pin_SDA2 = 17
 pin_SCL2 = 18
 pin_SDA0 = 8
 pin_SCL = 9
-
-loop = asyncio.get_event_loop()
 
 i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
 i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
@@ -81,42 +78,26 @@ def led_z():
         i = i *-1
         ledzneg.duty(i)
         
-          
-async def task_accel():
-    while True:
-        global x, y, z
-        x = float(imu.accel.x)
-        y = float(imu.accel.y)
-        z = float(imu.accel.z)
-async def task_led():    
-    while True:
-        led_x()
-        led_y()
-        led_z()
-async def task_disp():
-    while True:
-        Xstr = str("X: %0.2f " % x)
-        Ystr = str("Y: %0.2f " % y)
-        Zstr = str("Z: %0.2f " % z)
-        dist1 = str("Sensor 1: %0.0f " % tof1.read())
-        dist2 = str("Sensor 2: %0.0f " % tof2.read())
-        display1.fill(0)
-        display1.text(dist1, 8, 4, 1)
-        display1.text(dist2, 8, 20, 1)
-        display1.show()
-        display2.fill(0)
-        display2.text(Xstr, 8, 4, 1)
-        display2.text(Ystr, 8, 20, 1)
-        display2.text(Zstr, 8, 36, 1)
-        display2.show()
-        
-try:
-    loop.create_task(task_accel())             #start loop web
-    loop.create_task(task_led())            #start loop data
-    loop.create_task(task_disp())               #start loop main
-    loop.run_forever()
-except Exception as e:
-    print("Error Asyncio:", e)
-finally:
-    loop.close()
-    print("close")
+while True:
+    x = float(imu.accel.x)
+    y = float(imu.accel.y)
+    z = float(imu.accel.z)
+    led_x()
+    led_y()
+    led_z()
+    Xstr = str("X: %0.2f " % x)
+    Ystr = str("Y: %0.2f " % y)
+    Zstr = str("Z: %0.2f " % z)
+    dist1 = str("Sensor 1: %0.0f " % tof1.read())
+    dist2 = str("Sensor 2: %0.0f " % tof2.read())
+    display1.fill(0)
+    display1.text(dist1, 8, 4, 1)
+    display1.text(dist2, 8, 20, 1)
+    display1.show()
+    display2.fill(0)
+    display2.text(Xstr, 8, 4, 1)
+    display2.text(Ystr, 8, 20, 1)
+    display2.text(Zstr, 8, 36, 1)
+    display2.show()
+    
+    
