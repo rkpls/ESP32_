@@ -16,6 +16,9 @@ x_gees = 0
 y_gees = 0
 z_gees = 0
 
+ssid = 'Zenbook-14-Pals'
+password = 'Micropython'
+
 # ---------- DATA ----------
 volts = float(0.00)                         #
 amps = float(0.00)                          #
@@ -129,7 +132,7 @@ def wifi(ssid, password):
                 wlan.connect(ssid, password)
                 sleep_ms(1000)
         except:
-            pass
+            print("Wifi Connect Timeout")
 
 def gyro():
     try:
@@ -154,13 +157,6 @@ def distance_meaasurement_Front():
     except:
         print("Could not read distance to front")
 
-def read_desired_motor_speed():
-    global desired_motor_speed
-    try:
-        pass
-    except:
-        print("could not resolve desired motor speed")
-
 def read_current_motor_spped():
     global current_motor_speed
     try:
@@ -168,8 +164,15 @@ def read_current_motor_spped():
     except:
         print("could not read motor speed")
 
+def read_desired_motor_speed():
+    global desired_motor_speed
+    try:
+        pass
+    except:
+        print("could not resolve desired motor speed")
+
 def Oled_1():
-    global Xstr
+    global Xstr, v_calc
     Xstr = str("%0.2f " % x)
     display1.fill(0)
     display1.text("G-Kraft-LAteral:", 8, 4, 1)
@@ -187,86 +190,57 @@ def Oled_2():
 def geschwindigkeit():
     global x_gees, v_calc
     pass
-            
-class PIDController:
-    def __init__(self, setpoint, Kp, Ki, Kd):                               #PID class setup for update function
-        self.setpoint = setpoint
-        self.Kp = Kp
-        self.Ki = Ki
-        self.Kd = Kd
-        self.previous_error = 0
-        self.integral = 0
 
-    def update(self, current_process_value):
-        error = self.setpoint - current_process_value
-        proportional_term = self.Kp * error                                     # Calculate the proportional term
-        self.integral += error
-        integral_term = self.Ki * self.integral                                 # Calculate the integral term
-        derivative_term = self.Kd * (error - self.previous_error)               # Calculate the derivative term
-        self.previous_error = error                                             # Update the previous error value
-        control_output = proportional_term + integral_term + derivative_term    # Calculate the control output
-        return control_output
-    
-def set_motor_speed(power):
-    duty = power / 100 * 1023                   # ---- CHANGE THIS NEED BE RPM / power request to in Hz
-    if duty > 127:                              #vorwärts min 12.5%
-        motor_pwm_1.duty(0)
-        motor_pwm_2.freq(pwm_freq)
-        duty = int(duty)                        #make integer
-        motor_pwm_2.duty(duty)
-    elif duty < -127:                           #back min 12.5%
-        motor_pwm_2.duty(0)
-        motor_pwm_1.freq(pwm_freq)
-        duty = int(duty * -1)
-        motor_pwm_1.duty(duty)
-    else:                                       #motor aus
-        motor_pwm_1.duty(0)
-        motor_pwm_2.duty(0)
+# ---------- Motor:
+def set_motor():
+    pass
 
 # ---------- TASKS ----------
 # ---------- WEB AND COMMS ----------
 async def task_socket():
     while True:
+        sleep_ms(10000)
         pass
 
-
-# ---------- DATA MANAGE ----------
-async def task_monitor():                       # ---- TESTING! MAY NOT WORK ----
-    MPU6050.accel_range(2)                      #max G: +-8
-    MPU6050.accel_filter_range(3)               #filters vibrations averages every 11.8ms
+# ---------- DATA COLLECT ----------
+async def task_collect():
     while True:
         gyro()
+        distance_meaasurement_Top()
+        distance_meaasurement_Front()
+        read_current_motor_spped()
+
+# ---------- DATA MANAGE ----------
+async def task_monitor():
+    while True:
+        geschwindigkeit()
+        Oled_1()
 
 # ---------- MAIN CONTROL ----------
 async def task_main():
     while True:
-        #read_desired_motor_speed()
-        #read_current_motor_spped()
-        #measurement = current_motor_speed()        #Read your measurement here
-        #dt = time.time() - last_time            #Calculate the time difference
-        #output = pid.update(measurement, dt)
-        #set_motor_speed(output)                 #use the calculatet output variable as power in set_motor_speed
-        #last_time = time.time()
+        sleep_ms(10000)
+        set_motor()
         pass
 
 # ---------- MULTI ----------
 gc.enable()                                     #enable auto RAM Manager
+
 while not wlan.isconnected():
     try:
         wifi(ssid, password)                            #connect to wifi
     except:
         print("could not find a WIFI")
 
-display_qr()
-
 try:
     loop.create_task(task_socket())             #start loop web
+    loop.create_task(task_collect())            #sensors
     loop.create_task(task_monitor())            #start loop data
     loop.create_task(task_main())               #start loop main
     loop.run_forever()
 except Exception as e:
     print("Error Asyncio:", e)
 finally:
-    motor_pwm_1.duty(0)
-    motor_pwm_2.duty(0)
+    motor_pwm_fwd.duty(0)
+    motor_pwm_rvs.duty(0)
     loop.close()
