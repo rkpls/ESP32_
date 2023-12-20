@@ -1,32 +1,31 @@
-
-
 # ---------- LIBS ----------
 import gc
-from machine import Pin, PWM, SPI, SoftI2C, time_pulse_us            
-from utime import sleep_us
-from machine import Pin, PWM, SPI, I2C, time_pulse_us, lightsleep            
-from utime import sleep_ms, ticks_ms, ticks_diff 
-import uasyncio as asyncio                  #multitasking
-import gc                                   #RAM manager
-import network                              #wifi module
-import vl53l0x_x29 as VL53L0X_T                   #distance sensor ----- install vl53l0x_f.py
-import vl53l0x_x30 as VL53L0X_F                   #distance sensor ----- install vl53l0x_t.py
-import mpu6050  as MPU6050                  #G-Force Sensor ----- install GY521.py and vectro3d.py
-import esp2in9bv2 as esp2in9bv2
-from esp2in9bv2 import Display
+from machine import Pin, PWM, SPI, SoftI2C, time_pulse_us
+from utime import sleep_ms
+import uasyncio as asyncio
+import network
 
-
+from imu import MPU6050
+from vl53l0x import VL53L0X
+import sh1106
 
 # ---------- CHANGABLE VARS ----------
+dist1 = 0
+dist2 = 0
+x_gees = 0
+y_gees = 0
+z_gees = 0
 
 # ---------- DATA ----------
 volts = float(0.00)                         #
 amps = float(0.00)                          #
 watts = float(0.00)                         #
-Motor_RPM = float(0.00)                     #
 g_force_x = int(0)                          #convert to 0-1000 mm/s^2 = 1 m/s^2
 g_force_y = int(0)                          # ""
 g_force_z = int(0)                          # ""
+v_calc = float(0.00)                        # geschwindigkeit mit sensor
+v_wheel = float(0.00)                       # geschwindigkeit aus drehzahl
+Motor_RPM = float(0.00)                     #
 
 # ---------- VARS ----------
 pwm_freq = 1000                             #
@@ -37,55 +36,44 @@ current_motor_speed = 0                     #value for sensor reading (RPM)
 # ---------- PINS ----------
 # --------------------------
 
-Motor_Pin_1 = Pin(4)
-motor_pwm_1 = PWM(Motor_Pin_1)
-Motor_Pin_2 = Pin(5)
-motor_pwm_2 = PWM(Motor_Pin_2)
-
 Motor_Pin_fwd = Pin(4)
 motor_pwm_fwd = PWM(Motor_Pin_fwd)
 Motor_Pin_rvs = Pin(5)
 motor_pwm_rvs = PWM(Motor_Pin_rvs)
 
-
-pin_SDA1 = 15                                             # RTS 0 UART (Requiest to send) indicating to the receiver that it should be prepared to receive data.
-pin_SCL1 = 16                                             # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
-pin_SDA2 = 17                                             # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
-pin_SCL2 = 18                                             # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
+pin_SDA2 = 6
+pin_SCL2 = 7
+pin_SDA3 = 15                                            # RTS 0 UART (Requiest to send) indicating to the receiver that it should be prepared to receive data.
+pin_SCL3 = 16                                            # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
+pin_SDA4 = 17                                            # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
+pin_SCL4 = 18                                            # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
                                                          # UART = Universal Asynchronous Receiver-Transmitter
-
-pin_SDA0 = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro 
+pin_SDA5 = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro 
 #Pin_JTAG = 3                   # dont use (JTAG)
 #pin_LOG = 46                   # dont use (LOG)
-pin_SCL = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
-pin_SDA = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro and disance1 distance2
-#Pin_JTAG = 3                   # dont use (JTAG)
-#pin_LOG = 46                   # dont use (LOG)
-pin_SCL = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro and distance1 distance2
+pin_SCL5 = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
 
 pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
 pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
 pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
 pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
-                                                         # SPI = Serial Peripheral Interface bus protocol
 pin_DC = 14
-
-Volts_Pin = Pin(43, Pin.IN)              #  TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
-Amps_Pin = Pin(44, Pin.IN)               #  TXD 0 UART // Amps 1 Amps = 100mV
-
-pin_1 = 1
-pin_2 = 2
-#pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
-#pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
-#pin_40 = 40                                                # MTDO (Master Test Data Output) JTAG
-#pin_39 = 39                                                # MTCK (Master Test Clock Signal) JTAG
-#pin_builtin_LED = machine.Pin(38, machine.Pin.OUT)
-#pin_37 = 37                                                # USB OTG
-#pin_36 = 36                                                # USB OTG
-#pin_35 = 35                                                # USB OTG
+#----------
+Volts_Pin = Pin(43, Pin.IN)                              # TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
+Amps_Pin = Pin(44, Pin.IN)                               # TXD 0 UART // Amps 1 Amps = 100mV
+pin_SDA1 = 1
+pin_SCL1 = 2
+pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
+pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
+pin_40 = 40                                                # MTDO (Master Test Data Output) JTAG
+pin_39 = 39                                                # MTCK (Master Test Clock Signal) JTAG
+pin_builtin_LED = Pin(38, Pin.OUT)
+pin_37 = 37                                                # USB OTG
+pin_36 = 36                                                # USB OTG
+pin_35 = 35                                                # USB OTG
 #pins: BOOT / VSPI / RGB_LED
-pin_rst = 47
-pin_busy = 21
+pin_47 = 47
+pin_21 = 21
 #PINS USB_1 / USB_2
 
 #display:
@@ -94,28 +82,43 @@ pin_busy = 21
 #           DC is the Data / Command pin which we use to tell the Display if we are sending it a command instruction or actual data.
 #           RESET allows to send a hardware reset signal to the panel.
 
+
 # ---------- COMMS AND BUS SYSTEM SETUP ----------
 loop = asyncio.get_event_loop()
 
+# ----------- I2C Sensor Setup + addresses ----------
+i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
+i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
+i2c3 = SoftI2C(scl=Pin(pin_SCL3), sda=Pin(pin_SDA3), freq=100000)
+i2c4 = SoftI2C(scl=Pin(pin_SCL4), sda=Pin(pin_SDA4), freq=100000)
+i2c5 = SoftI2C(scl=Pin(pin_SCL5), sda=Pin(pin_SDA5), freq=100000)
+
+display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
+display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
+
+imu = MPU6050(i2c5)
+tof_top = VL53L0X(i2c3)
+tof_front = VL53L0X(i2c4)
+
+tof_top.set_measurement_timing_budget(10000)
+tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[0], 12)
+tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[1], 8)
+
+tof_front.set_measurement_timing_budget(10000)
+tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[0], 12)
+tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[1], 8)
+
+"""
 Display = 0
 try:
     spi = SPI(0, baudrate=4000000, sck=Pin(pin_SCK), mosi=Pin(pin_MOSI), miso=Pin(pin_MISO))         # !!! SPI !!!
     display = Display(spi, dc=Pin(pin_DC), cs=Pin(pin_CS), rst=Pin(pin_rst), busy=Pin(pin_busy))     # e-paper
 except:
     print("no SPI")
-
-i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
-i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
-i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
-
-mpu6050 = MPU6050(i2c0)                                                                          # gyro
-
-# ----------- I2C Sensor Setup + addresses ----------
-i2c = I2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA))                                                   # !!! I2C !!!
-mpu6050 = MPU6050(i2c)                                                                          # gyro
-
+"""
 
 # ---------- FUNCTIONS ----------
+# ---------- Peripheral:
 def wifi(ssid, password):
     wlan = network.WLAN(network.STA_IF)                     #setup wifi mode
     wlan.active(True)
@@ -130,31 +133,26 @@ def wifi(ssid, password):
 
 def gyro():
     try:
-        global g_force_x, g_force_y, g_force_z
-        read_x = float(MPU6050.gyro.x)
-        g_force_x = read_x / 4069
-        read_y = float(MPU6050.gyro.y)
-        g_force_y = read_y/ 4069    
-        read_z = float(MPU6050.gyro.z)
-        g_force_z = read_z /4096
-        print(g_force_x, g_force_y, g_force_z)
+        x_gees = float(imu.accel.x)
+        y_gees = float(imu.accel.y)
+        z_gees = float(imu.accel.z)
+        return x_gees, y_gees, z_gees
     except:
         print("Could not read accelerometer")
 
-def distance_meaasurement(self):
-    self.trigger.value(0)
-    sleep_us(5)
-    self.trigger.value(1)
-    sleep_us(10)
-    
-    dist = pulse_time = time_pulse_us(self.echo, 1, self.echo_timeout_us)
-    return dist
+def distance_meaasurement_Top():
+    try:
+        dist_top = str("Sensor 1: %0.0f " % tof_top.read())
+        return dist_top
+    except:
+        print("Could not read distance to top")
 
-def test_display():
-    print('Done.')
-
-def display_qr():
-    pass
+def distance_meaasurement_Front():
+    try:
+        dist_front = str("Sensor 1: %0.0f " % tof_front.read())
+        return dist_front
+    except:
+        print("Could not read distance to front")
 
 def read_desired_motor_speed():
     global desired_motor_speed
@@ -166,10 +164,29 @@ def read_desired_motor_speed():
 def read_current_motor_spped():
     global current_motor_speed
     try:
-        pass                                                                #add rpm sensor reading here
+        pass
     except:
         print("could not read motor speed")
-            
+
+def Oled_1():
+    global Xstr
+    Xstr = str("%0.2f " % x)
+    display1.fill(0)
+    display1.text("G-Kraft-LAteral:", 8, 4, 1)
+    display1.text(Xstr, 8, 20, 1)
+    display1.text("Geschwindigkeit:", 8, 36, 1)
+    display1.text(v_calc, 8, 52, 1)
+    display1.show()
+
+def Oled_2():
+    display2.fill(0)
+    display2.show()
+
+# ---------- Calculations:
+
+def geschwindigkeit():
+    global x_gees, v_calc
+    pass
             
 class PIDController:
     def __init__(self, setpoint, Kp, Ki, Kd):                               #PID class setup for update function

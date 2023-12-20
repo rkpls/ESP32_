@@ -32,9 +32,9 @@ pin_SCL1 = 16
 pin_SDA2 = 17
 pin_SCL2 = 18
 pin_SDA0 = 8
-pin_SCL = 9
+pin_SCL0 = 9
 
-i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
+i2c0 = SoftI2C(scl=Pin(pin_SCL0), sda=Pin(pin_SDA0), freq=100000)
 i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
 i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
 
