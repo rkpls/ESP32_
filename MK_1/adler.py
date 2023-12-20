@@ -2,7 +2,7 @@
 
 # ---------- LIBS ----------
 import gc
-from machine import Pin, PWM, SPI, I2C, time_pulse_us            
+from machine import Pin, PWM, SPI, SoftI2C, time_pulse_us            
 from utime import sleep_us
 import uasyncio as asyncio                  #multitasking
 import gc                                   #RAM manager
@@ -92,11 +92,11 @@ try:
 except:
     print("no SPI")
 
-i2c = I2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA))                                                   # !!! I2C !!!
-mpu6050 = MPU6050(i2c)                                                                          # gyro
+i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
+i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
+i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
 
-HCSR_sensor_1 = HCSR04(trigger_pin=pin_trg1, echo_pin=pin_echo1, echo_timeout_us=5000)          # HCSR 1 Top
-HCSR_sensor_2 = HCSR04(trigger_pin=pin_trg2, echo_pin=pin_echo2, echo_timeout_us=5000)          # HCSR 2 Front
+mpu6050 = MPU6050(i2c0)                                                                          # gyro
 
 
 # ---------- FUNCTIONS ----------
@@ -185,7 +185,7 @@ def set_motor_speed(power):
         motor_pwm_2.duty(0)
         motor_pwm_1.freq(pwm_freq)
         duty = int(duty * -1)
-        motor_pwm_2.duty(duty)
+        motor_pwm_1.duty(duty)
     else:                                       #motor aus
         motor_pwm_1.duty(0)
         motor_pwm_2.duty(0)

@@ -1,9 +1,27 @@
-
-from machine import Pin, SoftI2C
+import machine
+from machine import Pin, PWM, SoftI2C
 from time import sleep_ms
 from imu import MPU6050
 from vl53l0x import VL53L0X
 import sh1106
+
+
+x = 0
+y = 0
+z = 0
+
+ledxpos = PWM(Pin(42))
+ledxneg = PWM(Pin(41))
+ledxpos.freq(500)
+ledxneg.freq(500)
+ledypos = PWM(Pin(40))
+ledyneg = PWM(Pin(39))
+ledypos.freq(500)
+ledyneg.freq(500)
+ledzpos = PWM(Pin(38))
+ledzneg = PWM(Pin(37))
+ledzpos.freq(500)
+ledzneg.freq(500)
 
 pin_SDA1 = 15
 pin_SCL1 = 16
@@ -34,11 +52,39 @@ tof2.set_Vcsel_pulse_period(tof2.vcsel_period_type[1], 8)
 display1.fill(0)
 display2.fill(0)
 
+def led_x():
+    i = int(x*255)
+    if i >= 0 and i <= 1023:
+        ledxpos.duty(i)
+    if i <= 0 and i >= -1023:
+        i = i *-1
+        ledxneg.duty(i)
+def led_y():
+    i = int(y*255)
+    if i >= 0 and i <= 1023:
+        ledypos.duty(i)
+    if i <= 0 and i >= -1023:
+        i = i *-1
+        ledyneg.duty(i)
+def led_z():
+    i = int(z*255)
+    if i >= 0 and i <= 1023:
+        ledzpos.duty(i)
+    if i <= 0 and i >= -1023:
+        i = i *-1
+        ledzneg.duty(i)  
 
 while True:
-    X = str("X %0.2f " % imu.accel.x)
-    Y = str("Y %0.2f " % imu.accel.y)
-    Z = str("Z %0.2f " % imu.accel.z)
+    x = float(imu.accel.x)
+    y = float(imu.accel.y)
+    z = float(imu.accel.z)
+    led_x()
+    led_y()
+    led_z()
+"""    
+    X = str("X: %0.2f " % x)
+    Y = str("Y: %0.2f " % y)
+    Z = str("Z: %0.2f " % z)
     dist1 = str("Sensor 1: %0.0f " % tof1.read())
     dist2 = str("Sensor 2: %0.0f " % tof2.read())
     display1.fill(0)
@@ -50,5 +96,4 @@ while True:
     display2.text(Y, 8, 20, 1)
     display2.text(Z, 8, 36, 1)
     display2.show()
-    sleep_ms(50)
-
+"""
