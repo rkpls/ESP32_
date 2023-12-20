@@ -1,6 +1,6 @@
 # ---------- LIBS ----------
 import gc
-from machine import Pin, PWM, SPI, SoftI2C, time_pulse_us
+from machine import Pin, PWM, SPI, SoftI2C
 from utime import sleep_ms
 import uasyncio as asyncio
 import network
@@ -10,8 +10,8 @@ from vl53l0x import VL53L0X
 import sh1106
 
 # ---------- CHANGABLE VARS ----------
-dist1 = 0
-dist2 = 0
+dist_front = 0
+dist_top = 0
 x_gees = 0
 y_gees = 0
 z_gees = 0
@@ -31,18 +31,18 @@ v_wheel = float(0.00)                       # geschwindigkeit aus drehzahl
 Motor_RPM = float(0.00)                     #
 
 # ---------- VARS ----------
-pwm_freq = 1000                             #
-desired_motor_speed = 0                     #value for manual or calculated input (RPM)
-output = 0                                  #value useed by the PID controller
-current_motor_speed = 0                     #value for sensor reading (RPM)
+#pwm_freq = 1000                             #
+#desired_motor_speed = 0                     #value for manual or calculated input (RPM)
+#output = 0                                  #value useed by the PID controller
+#current_motor_speed = 0                     #value for sensor reading (RPM)
 
 # ---------- PINS ----------
 # --------------------------
 
-Motor_Pin_fwd = Pin(4)
-motor_pwm_fwd = PWM(Motor_Pin_fwd)
-Motor_Pin_rvs = Pin(5)
-motor_pwm_rvs = PWM(Motor_Pin_rvs)
+#Motor_Pin_fwd = Pin(4)
+#motor_pwm_fwd = PWM(Motor_Pin_fwd)
+#Motor_Pin_rvs = Pin(5)
+#motor_pwm_rvs = PWM(Motor_Pin_rvs)
 
 pin_SDA2 = 6
 pin_SCL2 = 7
@@ -56,27 +56,27 @@ pin_SDA5 = 8                                             # !!!! I2C DATA BUS SDA
 #pin_LOG = 46                   # dont use (LOG)
 pin_SCL5 = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
 
-pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
-pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
-pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
-pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
-pin_DC = 14
+#pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
+#pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
+#pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
+#pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
+#pin_DC = 14
 #----------
-Volts_Pin = Pin(43, Pin.IN)                              # TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
-Amps_Pin = Pin(44, Pin.IN)                               # TXD 0 UART // Amps 1 Amps = 100mV
+#Volts_Pin = Pin(43, Pin.IN)                              # TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
+#Amps_Pin = Pin(44, Pin.IN)                               # TXD 0 UART // Amps 1 Amps = 100mV
 pin_SDA1 = 1
 pin_SCL1 = 2
-pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
-pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
-pin_40 = 40                                                # MTDO (Master Test Data Output) JTAG
-pin_39 = 39                                                # MTCK (Master Test Clock Signal) JTAG
-pin_builtin_LED = Pin(38, Pin.OUT)
-pin_37 = 37                                                # USB OTG
-pin_36 = 36                                                # USB OTG
-pin_35 = 35                                                # USB OTG
+#pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
+#pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
+#pin_40 = 40                                                # MTDO (Master Test Data Output) JTAG
+#pin_39 = 39                                                # MTCK (Master Test Clock Signal) JTAG
+#pin_builtin_LED = Pin(38, Pin.OUT)
+#pin_37 = 37                                                # USB OTG
+#pin_36 = 36                                                # USB OTG
+#pin_35 = 35                                                # USB OTG
 #pins: BOOT / VSPI / RGB_LED
-pin_47 = 47
-pin_21 = 21
+#pin_47 = 47
+#pin_21 = 21
 #PINS USB_1 / USB_2
 
 #display:
@@ -87,160 +87,53 @@ pin_21 = 21
 
 
 # ---------- COMMS AND BUS SYSTEM SETUP ----------
-loop = asyncio.get_event_loop()
-
 # ----------- I2C Sensor Setup + addresses ----------
-i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
-i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
-i2c3 = SoftI2C(scl=Pin(pin_SCL3), sda=Pin(pin_SDA3), freq=100000)
-i2c4 = SoftI2C(scl=Pin(pin_SCL4), sda=Pin(pin_SDA4), freq=100000)
-i2c5 = SoftI2C(scl=Pin(pin_SCL5), sda=Pin(pin_SDA5), freq=100000)
-
-display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
-display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
-
-imu = MPU6050(i2c5)
-tof_top = VL53L0X(i2c3)
-tof_front = VL53L0X(i2c4)
-
-tof_top.set_measurement_timing_budget(10000)
-tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[0], 12)
-tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[1], 8)
-
-tof_front.set_measurement_timing_budget(10000)
-tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[0], 12)
-tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[1], 8)
-
-"""
-Display = 0
-try:
-    spi = SPI(0, baudrate=4000000, sck=Pin(pin_SCK), mosi=Pin(pin_MOSI), miso=Pin(pin_MISO))         # !!! SPI !!!
-    display = Display(spi, dc=Pin(pin_DC), cs=Pin(pin_CS), rst=Pin(pin_rst), busy=Pin(pin_busy))     # e-paper
-except:
-    print("no SPI")
-"""
-
-# ---------- FUNCTIONS ----------
-# ---------- Peripheral:
-def wifi(ssid, password):
-    wlan = network.WLAN(network.STA_IF)                     #setup wifi mode
-    wlan.active(True)
-    if not wlan.isconnected():
-        print('connecting')
-        try:
-            for i in range (5):
-                wlan.connect(ssid, password)
-                sleep_ms(1000)
-        except:
-            print("Wifi Connect Timeout")
-
-def gyro():
+def i2c_SPI_setup():
     try:
-        x_gees = float(imu.accel.x)
-        y_gees = float(imu.accel.y)
-        z_gees = float(imu.accel.z)
-        return x_gees, y_gees, z_gees
+        global i2c1, i2c2, i2c3, i2c4, i2c5
+        i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
+        i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
+        i2c3 = SoftI2C(scl=Pin(pin_SCL3), sda=Pin(pin_SDA3), freq=100000)
+        i2c4 = SoftI2C(scl=Pin(pin_SCL4), sda=Pin(pin_SDA4), freq=100000)
+        i2c5 = SoftI2C(scl=Pin(pin_SCL5), sda=Pin(pin_SDA5), freq=100000)
     except:
-        print("Could not read accelerometer")
+        print("could not innit i2c")
 
-def distance_meaasurement_Top():
+def sensor_setup():
     try:
-        dist_top = str("Sensor 1: %0.0f " % tof_top.read())
-        return dist_top
+        global display1, display2, imu, tof_top, tof_front
+        display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
+        display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
+        imu = MPU6050(i2c5)
+        tof_top = VL53L0X(i2c3)
+        tof_front = VL53L0X(i2c4)
+        tof_top.set_measurement_timing_budget(10000)
+        tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[0], 12)
+        tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[1], 8)
+        tof_front.set_measurement_timing_budget(10000)
+        tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[0], 12)
+        tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[1], 8)
     except:
-        print("Could not read distance to top")
+        print("could not innit sensors or display")
 
-def distance_meaasurement_Front():
-    try:
-        dist_front = str("Sensor 1: %0.0f " % tof_front.read())
-        return dist_front
-    except:
-        print("Could not read distance to front")
+i2c_SPI_setup()
+sensor_setup()
 
-def read_current_motor_spped():
-    global current_motor_speed
-    try:
-        pass
-    except:
-        print("could not read motor speed")
+display1.fill(0)
+display2.fill(0)
 
-def read_desired_motor_speed():
-    global desired_motor_speed
-    try:
-        pass
-    except:
-        print("could not resolve desired motor speed")
+while True:
 
-def Oled_1():
-    global Xstr, v_calc
-    Xstr = str("%0.2f " % x)
+    dist1 = str(tof_top.read())
+    dist2 = str(tof_front.read())
+    sleep_ms(50)
     display1.fill(0)
-    display1.text("G-Kraft-LAteral:", 8, 4, 1)
-    display1.text(Xstr, 8, 20, 1)
-    display1.text("Geschwindigkeit:", 8, 36, 1)
-    display1.text(v_calc, 8, 52, 1)
+    display1.text("Display 1", 0, 0, 1)
+    display1.text("Sensor 1", 0, 16, 1)
+    display1.text(dist1, 0, 32, 1)
     display1.show()
-
-def Oled_2():
     display2.fill(0)
+    display2.text("Display 2", 0, 0, 1)
+    display2.text("Sensor 2", 0, 16, 1)
+    display2.text(dist2, 0, 32, 1)
     display2.show()
-
-# ---------- Calculations:
-
-def geschwindigkeit():
-    global x_gees, v_calc
-    pass
-
-# ---------- Motor:
-def set_motor():
-    pass
-
-# ---------- TASKS ----------
-# ---------- WEB AND COMMS ----------
-async def task_socket():
-    while True:
-        sleep_ms(10000)
-        pass
-
-# ---------- DATA COLLECT ----------
-async def task_collect():
-    while True:
-        gyro()
-        distance_meaasurement_Top()
-        distance_meaasurement_Front()
-        read_current_motor_spped()
-
-# ---------- DATA MANAGE ----------
-async def task_monitor():
-    while True:
-        geschwindigkeit()
-        Oled_1()
-
-# ---------- MAIN CONTROL ----------
-async def task_main():
-    while True:
-        sleep_ms(10000)
-        set_motor()
-        pass
-
-# ---------- MULTI ----------
-gc.enable()                                     #enable auto RAM Manager
-
-while not wlan.isconnected():
-    try:
-        wifi(ssid, password)                            #connect to wifi
-    except:
-        print("could not find a WIFI")
-
-try:
-    loop.create_task(task_socket())             #start loop web
-    loop.create_task(task_collect())            #sensors
-    loop.create_task(task_monitor())            #start loop data
-    loop.create_task(task_main())               #start loop main
-    loop.run_forever()
-except Exception as e:
-    print("Error Asyncio:", e)
-finally:
-    motor_pwm_fwd.duty(0)
-    motor_pwm_rvs.duty(0)
-    loop.close()
