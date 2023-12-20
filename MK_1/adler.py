@@ -1,25 +1,20 @@
 
 
 # ---------- LIBS ----------
-<<<<<<< Updated upstream
 import gc
 from machine import Pin, PWM, SPI, SoftI2C, time_pulse_us            
 from utime import sleep_us
-=======
 from machine import Pin, PWM, SPI, I2C, time_pulse_us, lightsleep            
 from utime import sleep_ms, ticks_ms, ticks_diff 
->>>>>>> Stashed changes
 import uasyncio as asyncio                  #multitasking
 import gc                                   #RAM manager
 import network                              #wifi module
 import vl53l0x_x29 as VL53L0X_T                   #distance sensor ----- install vl53l0x_f.py
 import vl53l0x_x30 as VL53L0X_F                   #distance sensor ----- install vl53l0x_t.py
 import mpu6050  as MPU6050                  #G-Force Sensor ----- install GY521.py and vectro3d.py
-<<<<<<< Updated upstream
 import esp2in9bv2 as esp2in9bv2
 from esp2in9bv2 import Display
-=======
->>>>>>> Stashed changes
+
 
 
 # ---------- CHANGABLE VARS ----------
@@ -41,34 +36,32 @@ current_motor_speed = 0                     #value for sensor reading (RPM)
 
 # ---------- PINS ----------
 # --------------------------
-<<<<<<< Updated upstream
+
 Motor_Pin_1 = Pin(4)
 motor_pwm_1 = PWM(Motor_Pin_1)
 Motor_Pin_2 = Pin(5)
 motor_pwm_2 = PWM(Motor_Pin_2)
-=======
+
 Motor_Pin_fwd = Pin(4)
 motor_pwm_fwd = PWM(Motor_Pin_fwd)
 Motor_Pin_rvs = Pin(5)
 motor_pwm_rvs = PWM(Motor_Pin_rvs)
->>>>>>> Stashed changes
+
 
 pin_SDA1 = 15                                             # RTS 0 UART (Requiest to send) indicating to the receiver that it should be prepared to receive data.
 pin_SCL1 = 16                                             # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
 pin_SDA2 = 17                                             # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
 pin_SCL2 = 18                                             # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
                                                          # UART = Universal Asynchronous Receiver-Transmitter
-<<<<<<< Updated upstream
+
 pin_SDA0 = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro 
 #Pin_JTAG = 3                   # dont use (JTAG)
 #pin_LOG = 46                   # dont use (LOG)
 pin_SCL = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
-=======
 pin_SDA = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro and disance1 distance2
 #Pin_JTAG = 3                   # dont use (JTAG)
 #pin_LOG = 46                   # dont use (LOG)
 pin_SCL = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro and distance1 distance2
->>>>>>> Stashed changes
 
 pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
 pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
@@ -111,19 +104,16 @@ try:
 except:
     print("no SPI")
 
-<<<<<<< Updated upstream
 i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
 i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
 i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
 
 mpu6050 = MPU6050(i2c0)                                                                          # gyro
 
-=======
 # ----------- I2C Sensor Setup + addresses ----------
 i2c = I2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA))                                                   # !!! I2C !!!
 mpu6050 = MPU6050(i2c)                                                                          # gyro
 
->>>>>>> Stashed changes
 
 # ---------- FUNCTIONS ----------
 def wifi(ssid, password):
