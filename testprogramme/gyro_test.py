@@ -4,32 +4,27 @@ from time import sleep_ms
 from imu import MPU6050
 
 
-pin_SDA1 = 15
-pin_SCL1 = 16
-pin_SDA2 = 17
-pin_SCL2 = 18
-pin_SDA0 = 8
-pin_SCL = 9
 
-i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
-i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
-i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
+pin_SDA5 = 8
+pin_SCL5 = 9
+
+i2c5 = SoftI2C(scl=Pin(pin_SCL5), sda=Pin(pin_SDA5), freq=100000)
 
 
 print('Scan i2c bus...')
-devices0 = i2c0.scan()
+devices5 = i2c5.scan()
 #devices1 = i2c1.scan()
 #devices2 = i2c2.scan()
     
-if len(devices0) == 0:
+if len(devices5) == 0:
   print("No i2c device !")
 else:
-  print('i2c devices found:',len(devices0))
+  print('i2c devices found:',len(devices5))
 
-  for device0 in devices0:  
-    print("Decimal address: ",device0," | Hex address: ",hex(device0))
+  for device5 in devices5:  
+    print("Decimal address: ",device5," | Hex address: ",hex(device5))
     
-imu = MPU6050(i2c0)
+imu = MPU6050(i2c5)
 while True:
     sleep_ms(50)
     print("X: %0.1f " % imu.accel.x , "Y: %0.1f " % imu.accel.y, "Z: %0.1f " % imu.accel.z)

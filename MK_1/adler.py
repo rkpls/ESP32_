@@ -16,6 +16,12 @@ x_gees = 0
 y_gees = 0
 z_gees = 0
 
+display1 = 0
+display2 = 0
+imu = 0
+tof_top = 0
+tof_front = 0
+
 ssid = 'Zenbook-14-Pals'
 password = 'Micropython'
 
@@ -39,14 +45,12 @@ Motor_RPM = float(0.00)                     #
 # ---------- PINS ----------
 # --------------------------
 
-#Motor_Pin_fwd = Pin(4)
-#motor_pwm_fwd = PWM(Motor_Pin_fwd)
-#Motor_Pin_rvs = Pin(5)
-#motor_pwm_rvs = PWM(Motor_Pin_rvs)
+Volt_Pin = Pin(4)
+Amps_Pin = Pin(5)
 
 pin_SDA2 = 6
 pin_SCL2 = 7
-pin_SDA3 = 15                                            # RTS 0 UART (Requiest to send) indicating to the receiver that it should be prepared to receive data.
+pin_SDA3 = 15                                            # RTS 0 UART (Request to send) indicating to the receiver that it should be prepared to receive data.
 pin_SCL3 = 16                                            # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
 pin_SDA4 = 17                                            # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
 pin_SCL4 = 18                                            # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
@@ -60,14 +64,14 @@ pin_SCL5 = 9                                             # !!!! I2C DATA BUS SCL
 #pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
 #pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
 #pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
-#pin_DC = 14
+rpm_pin_14 = 14
 #----------
-#Volts_Pin = Pin(43, Pin.IN)                              # TXD 0 UART // Volts 1 Volts = 200mV (max read: 3.3V->16,5V -> Bat 12V/5)
-#Amps_Pin = Pin(44, Pin.IN)                               # TXD 0 UART // Amps 1 Amps = 100mV
+#Pin_RX = 43				#dont use
+#Pin_TX = 44				#dont use
 pin_SDA1 = 1
 pin_SCL1 = 2
-#pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
-#pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
+trg_pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
+echo_pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
 #pin_40 = 40                                                # MTDO (Master Test Data Output) JTAG
 #pin_39 = 39                                                # MTCK (Master Test Clock Signal) JTAG
 #pin_builtin_LED = Pin(38, Pin.OUT)
@@ -87,6 +91,7 @@ pin_SCL1 = 2
 
 
 # ---------- COMMS AND BUS SYSTEM SETUP ----------
+
 # ----------- I2C Sensor Setup + addresses ----------
 def i2c_SPI_setup():
     try:
@@ -102,9 +107,12 @@ def i2c_SPI_setup():
 def sensor_setup():
     try:
         global display1, display2, imu, tof_top, tof_front
+        
         display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
         display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
+        
         imu = MPU6050(i2c5)
+        
         tof_top = VL53L0X(i2c3)
         tof_front = VL53L0X(i2c4)
         tof_top.set_measurement_timing_budget(10000)
@@ -113,14 +121,24 @@ def sensor_setup():
         tof_front.set_measurement_timing_budget(10000)
         tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[0], 12)
         tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[1], 8)
+        
     except:
         print("could not innit sensors or display")
-
+        
+# ---------- INIT ----------
 i2c_SPI_setup()
 sensor_setup()
 
+display1.sleep(False)
+display2.sleep(False)
+display1.flip()
+display2.flip()
 display1.fill(0)
 display2.fill(0)
+display1.show()
+display2.show()
+
+# ---------- LOOP ----------
 
 while True:
 

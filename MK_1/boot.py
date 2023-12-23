@@ -35,39 +35,37 @@ def scan_i2c():
     for device1 in devices1:  
         print("Hex address: ",hex(device1))
     if len(devices1) == 0:
-        print("No i2c device !")
+        print("No i2c device")
     else:
         print('i2c devices found:',len(devices2))
 
     for device2 in devices2:  
         print("Hex address: ",hex(device2))
     if len(devices2) == 0:
-        print("No i2c device !")
+        print("No i2c device")
     else:
         print('i2c devices found:',len(devices2))
 
     for device3 in devices3:  
         print("Hex address: ",hex(device3))
     if len(devices3) == 0:
-        print("No i2c device !")
+        print("No i2c device")
     else:
         print('i2c devices found:',len(devices3))
         
     for device4 in devices4:  
         print("Hex address: ",hex(device4))
     if len(devices4) == 0:
-        print("No i2c device !")
+        print("No i2c device")
     else:
         print('i2c devices found:',len(devices4))
 
     for device5 in devices5:  
         print("Hex address: ",hex(device5))
     if len(devices5) == 0:
-        print("No i2c device !")
+        print("No i2c device")
     else:
         print('i2c devices found:',len(devices5))
 
 i2c_SPI_setup()
 scan_i2c()
-
-import main

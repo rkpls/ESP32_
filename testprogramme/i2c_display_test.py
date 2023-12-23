@@ -4,12 +4,10 @@ from time import sleep_ms
 import sh1106
 
 
-pin_SDA1 = 15
-pin_SCL1 = 16
-pin_SDA2 = 17
-pin_SCL2 = 18
-#pin_SDA0 = 8
-#pin_SCL = 9
+pin_SDA2 = 6
+pin_SCL2 = 7
+pin_SDA1 = 1
+pin_SCL1 = 2
 
 #i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
 i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
@@ -54,6 +52,10 @@ width=128
 height=64
 oled.fill(0) # clear to black
 
+display1.flip()
+oled.flip()
+
+
 # note that OLEDs have problems with screen burn it - don't leave this on too long!
 def border(width, height):
     oled.hline(0, 0, width - 1, 1) # top edge
@@ -83,6 +85,9 @@ direction_y = -1
 # oled.line(0, height-2, width-1, height-2, 1)
 
 # Bounce forever
+
+
+
 while True:
     draw_ball(current_x,current_y, ball_size,1)
     oled.show()
