@@ -48,3 +48,5 @@ while True:
     display2.text("Sensor 2", 0, 16, 1)
     display2.text(dist2, 0, 32, 1)
     display2.show()
+
+

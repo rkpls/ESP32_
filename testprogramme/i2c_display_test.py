@@ -1,60 +1,61 @@
 
 from machine import Pin, SoftI2C
+import machine
 from time import sleep_ms
+import utime
 import sh1106
 
-
-pin_SDA2 = 6
-pin_SCL2 = 7
 pin_SDA1 = 1
 pin_SCL1 = 2
-
-#i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
-i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
-i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
-"""
-print('Scan i2c bus...')
-#devices0 = i2c0.scan()
-devices1 = i2c1.scan()
-devices2 = i2c2.scan()
-   
-    
-if len(devices1) == 0:
-  print("No i2c device !")
-else:
-  print('i2c devices found:',len(devices1))
-
-  for device1 in devices1:  
-    print("Decimal address: ",device1," | Hexa address: ",hex(device1))
-
-if len(devices2) == 0:
-  print("No i2c device !")
-else:
-  print('i2c devices found:',len(devices2))
-
-  for device2 in devices2:  
-    print("Decimal address: ",device2," | Hexa address: ",hex(device2))
-
-"""
-
-
-display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)					#keine ahnung wofür pin(0)
-oled = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
-
-display1.sleep(False)
-
-display1.fill(0)
-display1.text('Micropython', 0, 0, 1)
-display1.text('Display 1', 0, 16, 1)
-display1.show()
+pin_SDA2 = 6
+pin_SCL2 = 7
+pin_SDA3 = 15
+pin_SCL3 = 16
+pin_SDA4 = 17
+pin_SCL4 = 18
+pin_SDA5 = 8
+pin_SCL5 = 9
 
 width=128
 height=64
-oled.fill(0) # clear to black
 
-display1.flip()
+i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
+i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
+
+display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
+
+display2.sleep(False)
+display2.flip()
+
+display2.fill(0) # clear to black
+display2.text('Adler Display', 0, 0, 1) # at x=0, y=0, white on black
+# line under title
+display2.hline(0, 9, 127, 1)
+# bottom of display
+display2.hline(0, 30, 127, 1)
+# left edge
+display2.vline(0, 10, 32, 1)
+# right edge
+display2.vline(127, 10, 32, 1)
+
+for i in range(0, 118):
+    # box x0, y0, width, height, on
+    display2.fill_rect(i,10, 10, 10, 1)
+    # draw black behind number
+    display2.fill_rect(10, 21, 30, 8, 0)
+    display2.text(str(i), 10, 21, 1)
+    display2.show() # update display
+    # utime.sleep(0.001)
+
+print('done')
+
+
+width=128
+height=64 # we could make this be 63 but the init method should use the full value
+# oled = SSD1306_I2C(width, height, i2c)
+oled = sh1106.SH1106_I2C(width, height, i2c1, machine.Pin(4), 0x3c)
 oled.flip()
-
+oled.fill(0) # clear to black
 
 # note that OLEDs have problems with screen burn it - don't leave this on too long!
 def border(width, height):
@@ -85,9 +86,6 @@ direction_y = -1
 # oled.line(0, height-2, width-1, height-2, 1)
 
 # Bounce forever
-
-
-
 while True:
     draw_ball(current_x,current_y, ball_size,1)
     oled.show()

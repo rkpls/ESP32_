@@ -4,44 +4,48 @@ from time import sleep_ms
 from vl53l0x import VL53L0X
 
 
-pin_SDA1 = 15
-pin_SCL1 = 16
-pin_SDA2 = 17
-pin_SCL2 = 18
-#pin_SDA0 = 8
-#pin_SCL = 9
+pin_SDA1 = 1
+pin_SCL1 = 2
+pin_SDA2 = 6
+pin_SCL2 = 7
+pin_SDA3 = 15
+pin_SCL3 = 16
+pin_SDA4 = 17
+pin_SCL4 = 18
+pin_SDA5 = 8
+pin_SCL5 = 9
 
-#i2c0 = SoftI2C(scl=Pin(pin_SCL), sda=Pin(pin_SDA0), freq=100000)
-i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
-i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
+
+i2c3 = SoftI2C(scl=Pin(pin_SCL3), sda=Pin(pin_SDA3), freq=100000)
+i2c4 = SoftI2C(scl=Pin(pin_SCL4), sda=Pin(pin_SDA4), freq=100000)
 
 print('Scan i2c bus...')
-#devices0 = i2c0.scan()
-devices1 = i2c1.scan()
-devices2 = i2c2.scan()
+
+devices3 = i2c3.scan()
+devices4 = i2c4.scan()
    
     
-if len(devices1) == 0:
+if len(devices3) == 0:
   print("No i2c device !")
 else:
-  print('i2c devices found:',len(devices1))
+  print('i2c devices found:',len(devices3))
 
-  for device1 in devices1:  
-    print("Decimal address: ",device1," | Hexa address: ",hex(device1))
+  for device3 in devices3:  
+    print("Decimal address: ",device3," | Hexa address: ",hex(device3))
 
-if len(devices2) == 0:
+if len(devices4) == 0:
   print("No i2c device !")
 else:
-  print('i2c devices found:',len(devices2))
+  print('i2c devices found:',len(devices4))
 
-  for device2 in devices2:  
-    print("Decimal address: ",device2," | Hexa address: ",hex(device2))
+  for device4 in devices4:  
+    print("Decimal address: ",device4," | Hexa address: ",hex(device4))
     
     
 
 # Create VL53L0X objects
-tof1 = VL53L0X(i2c1)
-tof2 = VL53L0X(i2c2)
+tof1 = VL53L0X(i2c3)
+tof2 = VL53L0X(i2c4) 
 
 # the measuring_timing_budget is a value in ms, the longer the budget, the more accurate the reading.
 budget = tof1.measurement_timing_budget_us

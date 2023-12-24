@@ -5,6 +5,14 @@ from imu import MPU6050
 
 
 
+pin_SDA1 = 1
+pin_SCL1 = 2
+pin_SDA2 = 6
+pin_SCL2 = 7
+pin_SDA3 = 15
+pin_SCL3 = 16
+pin_SDA4 = 17
+pin_SCL4 = 18
 pin_SDA5 = 8
 pin_SCL5 = 9
 
@@ -26,5 +34,5 @@ else:
     
 imu = MPU6050(i2c5)
 while True:
-    sleep_ms(50)
+    sleep_ms(200)
     print("X: %0.1f " % imu.accel.x , "Y: %0.1f " % imu.accel.y, "Z: %0.1f " % imu.accel.z)

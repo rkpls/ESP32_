@@ -16,8 +16,8 @@ x_gees = 0
 y_gees = 0
 z_gees = 0
 
-display1 = 0
-display2 = 0
+oled1 = 0
+oled2 = 0
 imu = 0
 tof_top = 0
 tof_front = 0
@@ -89,7 +89,6 @@ echo_pin_41 = 41                                                # MTDI (Master T
 #           DC is the Data / Command pin which we use to tell the Display if we are sending it a command instruction or actual data.
 #           RESET allows to send a hardware reset signal to the panel.
 
-
 # ---------- COMMS AND BUS SYSTEM SETUP ----------
 
 # ----------- I2C Sensor Setup + addresses ----------
@@ -106,7 +105,7 @@ def i2c_SPI_setup():
 
 def sensor_setup():
     try:
-        global display1, display2, imu, tof_top, tof_front
+        global oled1, oled2, imu, tof_top, tof_front
         
         display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
         display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
@@ -129,14 +128,11 @@ def sensor_setup():
 i2c_SPI_setup()
 sensor_setup()
 
-display1.sleep(False)
-display2.sleep(False)
-display1.flip()
-display2.flip()
-display1.fill(0)
-display2.fill(0)
-display1.show()
-display2.show()
+
+oled1.fill(0)
+oled2.fill(0)
+oled1.show()
+oled2.show()
 
 # ---------- LOOP ----------
 
