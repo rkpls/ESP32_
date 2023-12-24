@@ -5,7 +5,10 @@ from utime import sleep_ms
 import uasyncio as asyncio
 import network 
 
+from utime import ticks_us, ticks_diff, sleep_ms 
 
+passed = ticks_us()
+counter = 0
 from PID import PID
 from imu import MPU6050
 from vl53l0x import VL53L0X
@@ -68,7 +71,10 @@ pin_SCL5 = 9                                             # !!!! I2C DATA BUS SCL
 #pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
 #pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
 #pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
-rpm_pin_14 = 14
+
+pin_14 = 14
+pin_opto = Pin(pin_14, Pin.IRQ_RISING)
+
 #----------
 #Pin_RX = 43				#dont use
 #Pin_TX = 44				#dont use
@@ -144,26 +150,26 @@ while True:
 
     dist1 = str(tof_top.read())
     dist2 = str(tof_front.read())
+    time = ticks_us()
+    counter += pin_opto.value()
+    if ticks_diff(time, passed) > 100000:                           #100ms interval
+        rpm = float(counter * 10 * 60 / ticks_diff(time, passed))
+        passed = time
+        counter = 0
+
+    v = controlled_system.update(0)
+
+    control = pid(rpm) 
+    v = controlled_system.update(control)
+
     sleep_ms(50)
     display1.fill(0)
-    display1.text("Display 1", 0, 0, 1)
-    display1.text("Sensor 1", 0, 16, 1)
-    display1.text(dist1, 0, 32, 1)
+    display1.text(rpm, 0, 0, 1)
+    display1.text(v, 0, 16, 1)
+    display1.text(" ", 0, 32, 1)
     display1.show()
     display2.fill(0)
-    display2.text("Display 2", 0, 0, 1)
-    display2.text("Sensor 2", 0, 16, 1)
-    display2.text(dist2, 0, 32, 1)
+    display2.text(dist1, 0, 0, 1)
+    display2.text(dist2, 0, 16, 1)
+    display2.text("", 0, 32, 1)
     display2.show()
-
-
-
-# Assume we have a system we want to control in controlled_system
-v = controlled_system.update(0)
-
-while True:
-    # Compute new output from the PID according to the systems current value
-    control = pid(v)
-    
-    # Feed the PID output to the system and get its current value
-    v = controlled_system.update(control)
