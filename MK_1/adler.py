@@ -3,8 +3,10 @@ import gc
 from machine import Pin, PWM, SPI, SoftI2C
 from utime import sleep_ms
 import uasyncio as asyncio
-import network
+import network 
 
+
+from PID import PID
 from imu import MPU6050
 from vl53l0x import VL53L0X
 import sh1106
@@ -21,6 +23,8 @@ oled2 = 0
 imu = 0
 tof_top = 0
 tof_front = 0
+
+pid = PID(1, 0.1, 0.05, setpoint=1, scale='us')
 
 ssid = 'Zenbook-14-Pals'
 password = 'Micropython'
@@ -151,3 +155,15 @@ while True:
     display2.text("Sensor 2", 0, 16, 1)
     display2.text(dist2, 0, 32, 1)
     display2.show()
+
+
+
+# Assume we have a system we want to control in controlled_system
+v = controlled_system.update(0)
+
+while True:
+    # Compute new output from the PID according to the systems current value
+    control = pid(v)
+    
+    # Feed the PID output to the system and get its current value
+    v = controlled_system.update(control)
