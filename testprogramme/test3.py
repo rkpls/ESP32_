@@ -1,4 +1,4 @@
-
+from utime import ticks_us, ticks_diff, sleep_ms
 from machine import Pin, SoftI2C
 from time import sleep_ms
 from vl53l0x import VL53L0X
@@ -15,6 +15,15 @@ pin_SDA4 = 17
 pin_SCL4 = 18
 pin_SDA5 = 8
 pin_SCL5 = 9
+
+pin_14 = 14
+pin_opto = Pin(pin_14, Pin.IRQ_RISING)
+
+passed = ticks_us()
+counter = 0
+
+rpm = 0
+rpm_format = 0
 
 dist1 = 0
 dist2 = 0
@@ -37,14 +46,24 @@ display2.fill(0)
 display2.flip()
 
 while True:
+    time = ticks_us()
+    counter += pin_opto.value()
 
+    if ticks_diff(time, passed) > 100000:                           #100ms interval
+        rpm = float(counter * 10 * 60 / ticks_diff(time, passed))
+        rpm_format = ("{:.2f}".format(rpm))
+        passed = time
+        counter = 0
+        
     dist1 = str(tof1.read())
     
     sleep_ms(50)
     display2.fill(0)
-    display2.text("Display 2", 0, 0, 1)
-    display2.text("Sensor1", 0, 16, 1)
-    display2.text(dist1, 0, 32, 1)
+    display2.text(dist1, 0, 0, 1)
+    display2.text(rpm_format, 0, 16, 1)
+    display2.text("", 0, 32, 1)
+    display2.text("", 0, 48, 1)
     display2.show()
+
 
 

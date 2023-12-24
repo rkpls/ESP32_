@@ -45,7 +45,6 @@ else:
 
 # Create VL53L0X objects
 tof1 = VL53L0X(i2c3)
-tof2 = VL53L0X(i2c4) 
 
 # the measuring_timing_budget is a value in ms, the longer the budget, the more accurate the reading.
 budget = tof1.measurement_timing_budget_us
@@ -63,14 +62,7 @@ tof1.set_Vcsel_pulse_period(tof1.vcsel_period_type[0], 12)
 tof1.set_Vcsel_pulse_period(tof1.vcsel_period_type[1], 8)
 
 
-budget = tof2.measurement_timing_budget_us
-tof2.set_measurement_timing_budget(10000)
-tof2.set_Vcsel_pulse_period(tof2.vcsel_period_type[0], 12)
-tof2.set_Vcsel_pulse_period(tof2.vcsel_period_type[1], 8)
-
-
-
 while True:
     print("Tof1: ",tof1.read())
-    print("Tof2: ",tof2.read())
+
     sleep_ms(100)

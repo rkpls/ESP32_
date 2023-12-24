@@ -7,14 +7,14 @@ import network
 
 from utime import ticks_us, ticks_diff, sleep_ms 
 
-passed = ticks_us()
-counter = 0
-from PID import PID
 from imu import MPU6050
 from vl53l0x import VL53L0X
 import sh1106
+import hcsr04 as HCSR04
 
 # ---------- CHANGABLE VARS ----------
+loop = asyncio.get_event_loop()
+
 dist_front = 0
 dist_top = 0
 x_gees = 0
@@ -27,7 +27,11 @@ imu = 0
 tof_top = 0
 tof_front = 0
 
-pid = PID(1, 0.1, 0.05, setpoint=1, scale='us')
+dist1 = 0
+dist2 = 0
+dist3_average = []
+dist3 = 0
+dist3_merker = 0
 
 ssid = 'Zenbook-14-Pals'
 password = 'Micropython'
@@ -105,7 +109,7 @@ echo_pin_41 = 41                                                # MTDI (Master T
 def i2c_SPI_setup():
     try:
         global i2c1, i2c2, i2c3, i2c4, i2c5
-        i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
+        #i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
         i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
         i2c3 = SoftI2C(scl=Pin(pin_SCL3), sda=Pin(pin_SDA3), freq=100000)
         i2c4 = SoftI2C(scl=Pin(pin_SCL4), sda=Pin(pin_SDA4), freq=100000)
@@ -115,61 +119,118 @@ def i2c_SPI_setup():
 
 def sensor_setup():
     try:
-        global oled1, oled2, imu, tof_top, tof_front
+        global oled1, oled2, imu, tof_top, tof_front, sensor_radar
         
-        display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
-        display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
+        #oled1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
+        oled2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
         
         imu = MPU6050(i2c5)
-        
+        sensor_radar = HCSR04(trigger_pin=42, echo_pin=41)   
         tof_top = VL53L0X(i2c3)
-        tof_front = VL53L0X(i2c4)
+        #tof_front = VL53L0X(i2c4)
         tof_top.set_measurement_timing_budget(10000)
         tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[0], 12)
         tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[1], 8)
-        tof_front.set_measurement_timing_budget(10000)
-        tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[0], 12)
-        tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[1], 8)
-        
+        #tof_front.set_measurement_timing_budget(10000)
+        #tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[0], 12)
+        #tof_front.set_Vcsel_pulse_period(tof_top.vcsel_period_type[1], 8)
     except:
         print("could not innit sensors or display")
-        
+
+class PIDController:
+    def __init__(self, Kp, Ki, Kd, setpoint):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.setpoint = setpoint
+        self.prev_error = 0
+        self.integral = 0
+
+    def compute(self, current_value):
+        error = self.setpoint - current_value
+        self.integral += error
+        derivative = error - self.prev_error
+        output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+        self.prev_error = error
+        return output
+    
+def read_radar():
+    distance = sensor_radar.distance_cm()
+    dist3_average.append(distance)
+
+    if len(dist3_average) == 10:
+        for i in dist3_average:
+            dist3_merker += i
+        dist3 = dist3_merker / len(dist3_average)
+        print(dist3)
+        dist3 = 0
+        dist3_merker = 0
+        dist3_average = []
+    sleep_ms(10)
+    
+
 # ---------- INIT ----------
 i2c_SPI_setup()
 sensor_setup()
 
+passed = ticks_us()
+counter = 0
 
-oled1.fill(0)
+#oled1.fill(0)
 oled2.fill(0)
-oled1.show()
+#oled1.flip()
+oled2.flip()
+#oled1.show()
 oled2.show()
 
 # ---------- LOOP ----------
+async def task_sensors():
+    while True:
+        time = ticks_us()
+        counter += pin_opto.value()
+        if ticks_diff(time, passed) > 10000:                           #10ms interval
+            rpm = float(counter / 2 * 26 / 24 / 4 * 100 * 60 / ticks_diff(time, passed))
+            passed = time
+            counter = 0
+async def task_main():
+    if __name__ == "__main__":
+        Kp = 1.0
+        Ki = 0.1
+        Kd = 0.01
+        setpoint_rpm = 1000
+        pid_controller = PIDController(Kp, Ki, Kd, setpoint_rpm)
+        current_rpm = 0
 
-while True:
+        for _ in range(100):
+            pid_output = pid_controller.compute(current_rpm)
+            current_rpm += pid_output
+            sleep_ms(100)
+    
+async def task_monitor():
+    while True:
+        sleep_ms(100)
+        #oled1.fill(0)
+        #oled1.text(rpm, 0, 0, 1)
+        #oled1.text(v, 0, 16, 1)
+        #oled1.text(" ", 0, 32, 1)
+        #oled1.show()
+        dist1_str = str(tof_top.read())
+        #dist2_str = str(tof_front.read())
+        oled2.fill(0)
+        oled2.text(dist1_str, 0, 0, 1)
+        #oled2.text(dist2_str, 0, 16, 1)
+        #oled2.text("dist3", 0, 32, 1)
+        oled2.show()
+    
+gc.enable()
 
-    dist1 = str(tof_top.read())
-    dist2 = str(tof_front.read())
-    time = ticks_us()
-    counter += pin_opto.value()
-    if ticks_diff(time, passed) > 10000:                           #10ms interval
-        rpm = float(counter * 100 * 60 / ticks_diff(time, passed))
-        passed = time
-        counter = 0
-
-    v = controlled_system.update(0)
-
-    control = pid(rpm) 
-    v = controlled_system.update(control)
-
-    sleep_ms(50)
-    display1.fill(0)
-    display1.text(rpm, 0, 0, 1)
-    display1.text(v, 0, 16, 1)
-    display1.text(" ", 0, 32, 1)
-    display1.show()
-    display2.fill(0)
-    display2.text(dist1, 0, 0, 1)
-    display2.text(dist2, 0, 16, 1)
-    display2.text("", 0, 32, 1)
-    display2.show()
+try:
+    loop.create_task(task_sensors())
+    loop.create_task(task_main())
+    loop.create_task(task_monitor())
+    loop.run_forever()
+except Exception as e:
+    print("Error:", e)
+finally:
+    print("loop closed")
+    loop.close()
