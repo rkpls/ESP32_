@@ -152,8 +152,8 @@ while True:
     dist2 = str(tof_front.read())
     time = ticks_us()
     counter += pin_opto.value()
-    if ticks_diff(time, passed) > 100000:                           #100ms interval
-        rpm = float(counter * 10 * 60 / ticks_diff(time, passed))
+    if ticks_diff(time, passed) > 10000:                           #10ms interval
+        rpm = float(counter * 100 * 60 / ticks_diff(time, passed))
         passed = time
         counter = 0
 
