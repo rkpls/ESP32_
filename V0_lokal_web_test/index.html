@@ -33,13 +33,13 @@
 
     <script>
         let lastSentValue = 0;
-        const requestInterval = 2000; // Request interval in milliseconds (e.g., 2000 = 2 seconds)
+        const requestInterval = 250; // Request interval
 
         function submitForm() {
             var inputElement = document.getElementById("integerInput");
             var inputValue = parseInt(inputElement.value);
 
-            // Limit the request rate
+            // Limit request rate
             if (Math.abs(inputValue - lastSentValue) >= 1) {
                 sendData(inputValue);
                 lastSentValue = inputValue;
