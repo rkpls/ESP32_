@@ -44,25 +44,28 @@ else:
     
 
 # Create VL53L0X objects
-tof1 = VL53L0X(i2c3)
+try:
+    tof1 = VL53L0X(i2c3)
+    budget1 = tof1.measurement_timing_budget_us
+    tof1.set_measurement_timing_budget(10000)
+    tof1.set_Vcsel_pulse_period(tof1.vcsel_period_type[0], 12)
+    tof1.set_Vcsel_pulse_period(tof1.vcsel_period_type[1], 8)
 
-# the measuring_timing_budget is a value in ms, the longer the budget, the more accurate the reading.
-budget = tof1.measurement_timing_budget_us
-tof1.set_measurement_timing_budget(10000)
-
-# Sets the VCSEL (vertical cavity surface emitting laser) pulse period for the
-# given period type (VL53L0X::VcselPeriodPreRange or VL53L0X::VcselPeriodFinalRange) 
-# to the given value (in PCLKs). Longer periods increase the potential range of the sensor. 
-# Valid values are (even numbers only):
-
-# tof.set_Vcsel_pulse_period(tof.vcsel_period_type[0], 18)
-tof1.set_Vcsel_pulse_period(tof1.vcsel_period_type[0], 12)
-
-# tof.set_Vcsel_pulse_period(tof.vcsel_period_type[1], 14)
-tof1.set_Vcsel_pulse_period(tof1.vcsel_period_type[1], 8)
-
+    tof2 = VL53L0X(i2c4)
+    budget2 = tof2.measurement_timing_budget_us
+    tof2.set_measurement_timing_budget(10000)
+    tof2.set_Vcsel_pulse_period(tof2.vcsel_period_type[0], 12)
+    tof2.set_Vcsel_pulse_period(tof2.vcsel_period_type[1], 8)
+except:
+    pass
 
 while True:
-    print("Tof1: ",tof1.read())
-
+    try:
+        print("Tof1: ",tof1.read())
+    except:
+        pass
+    try:
+        print("Tof2: ",tof2.read())
+    except:
+        pass
     sleep_ms(100)

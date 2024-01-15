@@ -1,7 +1,7 @@
 # ---------- LIBS ----------
 import gc
-from machine import Pin, PWM, SPI, SoftI2C
-from utime import sleep_ms
+from machine import Pin, PWM, ADC, SoftI2C
+from utime import ticks_us, ticks_diff, sleep_ms 
 import uasyncio as asyncio
 import network
 
@@ -10,20 +10,30 @@ from vl53l0x import VL53L0X
 import sh1106
 
 # ---------- CHANGABLE VARS ----------
-dist_front = 0
-dist_top = 0
+system_check = 10
+
+dist_front = 8190
+dist_top = 8190
 x_gees = 0
 y_gees = 0
 z_gees = 0
+
+dist_top_values = []
+dist_front_values = []
 
 oled1 = 0
 oled2 = 0
 imu = 0
 tof_top = 0
 tof_front = 0
+tof_top_active = False
+tof_front_active = False
 
-ssid = 'Zenbook-14-Pals'
-password = 'Micropython'
+rpm = 0
+passed = ticks_us()
+counter = 0
+
+pwm_freq = 200
 
 # ---------- DATA ----------
 volts = float(0.00)                         #
@@ -45,26 +55,28 @@ Motor_RPM = float(0.00)                     #
 # ---------- PINS ----------
 # --------------------------
 
-Volt_Pin = Pin(4)
-Amps_Pin = Pin(5)
+Volt_Pin = ADC(Pin(4))                      #0.2V per V
+Amps_Pin = ADC(Pin(5))                      #0.1V per A
 
 pin_SDA2 = 6
 pin_SCL2 = 7
-pin_SDA3 = 15                                            # RTS 0 UART (Request to send) indicating to the receiver that it should be prepared to receive data.
-pin_SCL3 = 16                                            # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
-pin_SDA4 = 17                                            # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
-pin_SCL4 = 18                                            # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
-                                                         # UART = Universal Asynchronous Receiver-Transmitter
-pin_SDA5 = 8                                             # !!!! I2C DATA BUS SDA !! used for Gyro 
+pin_SDA3 = 15                                             # RTS 0 UART (Request to send) indicating to the receiver that it should be prepared to receive data.
+pin_SCL3 = 16                                             # CTS 0 UART (Clear to Send) indicating to the sender that it can proceed with transmitting data.
+pin_SDA4 = 17                                             # TXD 1 UART (Transmit Data) sensor readings, commands, or any other information that needs to be transmitted.
+pin_SCL4 = 18                                             # RXD 1 UART (Recieve Data) incoming data,such as commands, sensor readings, or any other information sent by the external device
+                                                          # UART = Universal Asynchronous Receiver-Transmitter
+pin_SDA5 = 8                                              # !!!! I2C DATA BUS SDA !! used for Gyro 
 #Pin_JTAG = 3                   # dont use (JTAG)
 #pin_LOG = 46                   # dont use (LOG)
-pin_SCL5 = 9                                             # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
+pin_SCL5 = 9                                              # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
 
 #pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
-#pin_MOSI = 11                                            # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
-#pin_MISO = 12                                            # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
+pin_FWD = 11                                              # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
+pwm_fwd = PWM(pin_FWD)
+pin_RVS = 12                                              # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
+pwm_rvs = PWM(pin_RVS)
 #pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
-rpm_pin_14 = 14
+rpm_pin_14 = Pin(14, Pin.IN)
 #----------
 #Pin_RX = 43				#dont use
 #Pin_TX = 44				#dont use
@@ -96,7 +108,7 @@ echo_pin_41 = 41                                                # MTDI (Master T
 def i2c_SPI_setup():
     try:
         global i2c1, i2c2, i2c3, i2c4, i2c5
-        i2c1 =  SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
+        i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
         i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
         i2c3 = SoftI2C(scl=Pin(pin_SCL3), sda=Pin(pin_SDA3), freq=100000)
         i2c4 = SoftI2C(scl=Pin(pin_SCL4), sda=Pin(pin_SDA4), freq=100000)
@@ -105,50 +117,155 @@ def i2c_SPI_setup():
         print("could not innit i2c")
 
 def sensor_setup():
-    try:
-        global oled1, oled2, imu, tof_top, tof_front
-        
-        display1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)
-        display2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)
-        
+    global oled1, oled2, imu, tof_top, tof_front, tof_top_active, tof_front_active
+    try:    
+        oled1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)                              #rechts
+        oled2 = sh1106.SH1106_I2C(128, 64, i2c2, Pin(0), 0x3c)                              #links
+    except:
+        print("could not innit displays")
+    try:    
         imu = MPU6050(i2c5)
-        
+    except:
+        print("could not innit imu")
+    try:
         tof_top = VL53L0X(i2c3)
-        tof_front = VL53L0X(i2c4)
         tof_top.set_measurement_timing_budget(10000)
         tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[0], 12)
         tof_top.set_Vcsel_pulse_period(tof_top.vcsel_period_type[1], 8)
+        tof_top_active = True
+    except:
+        tof_top_active = False
+        print("could not innit tof top sensor")
+    try:
+        tof_front = VL53L0X(i2c4)
         tof_front.set_measurement_timing_budget(10000)
         tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[0], 12)
         tof_front.set_Vcsel_pulse_period(tof_front.vcsel_period_type[1], 8)
-        
+        tof_front_active = True
     except:
-        print("could not innit sensors or display")
+        tof_front_active = False
+        print("could not innit tof front sensor")        
+
+def average(values):
+    if len(values) > 0:
+        return sum(values) / len(values)
+    else:
+        return 0
         
+def read_dist_sensors():
+    global dist_top, dist_front, dist_top_values, dist_front_values
+    if tof_top_active:
+        try:
+            dist_top_values.append(int(tof_top.read()))
+            if len(dist_top_values) >= 5:
+                dist_top_values.pop(0)
+            dist_top = average(dist_top_values)
+        except:
+            system_check -1
+    if tof_front_active:
+        try:
+            dist_front_values.append(int(tof_front.read()))
+            if len(dist_front_values) >= 5:
+                dist_front_values.pop(0)
+            dist_front = average(dist_front_values)
+        except:
+            pass
+
+def read_accel():
+    global x_gees, y_gees, z_gees
+    try:
+        x_gees = float(imu.accel.x)
+        y_gees = float(imu.accel.y)
+        z_gees = float(imu.accel.z)
+    except:
+        pass
+        
+def read_rpm():
+    global rpm, passed, counter
+    time = ticks_us()
+    if (ticks_diff(time, passed) > 500):
+        passed = time   
+        time = ticks_us()
+        rpm = float(counter / 24 * 52 / 13 / 1 * 60)
+        counter = 0
+    else:
+        pass
+
+def interrupt_handler(pin):
+    global counter
+    counter += 1
+
+def read_batt():
+    global volts, amps
+    try:
+        v_read = int(Volt_Pin.read())
+        volts = v_read * 5 / (4069/3.3)
+        a_read = int(Volt_Pin.read() )
+        amps = a_read / 10 / (4069/3.3)
+    except:
+        print("could not read battery status")
+        
+def refresh_oled():
+    oled1.fill(0)
+    oled1.text("Adler Sensoren", 0, 0, 1)
+    oled1.text("Oben:", 0, 16, 1)
+    oled1.text("Vorne:", 0, 32, 1)
+    oled1.text("Beschl.:", 0, 48, 1)
+    data_t = str(dist_top)
+    oled1.text(data_t, 96, 16, 1)
+    data_f = str(dist_front)
+    oled1.text(data_f, 96, 32, 1)
+    data_g = str(x_gees)
+    oled1.text(data_g, 96, 48, 1)
+    oled1.show()
+    
+    oled2.fill(0)
+    oled2.text("Adler Ueberwachung", 0, 0, 1)
+    oled2.text("Spannung:", 0, 16, 1)
+    oled2.text("Strom:", 0, 32, 1)
+    oled2.text("RPM:", 0, 48, 1) 
+    data_v = str(volts)
+    oled2.text(data_v, 80, 16, 1)
+    data_a = str(amps)
+    oled2.text(data_a, 80, 32, 1)
+    data_rpm = str(rpm)
+    oled2.text(data_rpm, 80, 48, 1)    
+    oled2.show()
+    
+def motor_control():
+    if system_check == 10:
+        if dist_top < 120 and dist_top > 50:
+            pwm_fwd.duty(700)
+        else:
+            pwm_fwd.duty(0)
+    else:
+        pwm_fwd.duty(0)
+        print("sensor failure")
 # ---------- INIT ----------
+pwm_fwd.duty(0)
 i2c_SPI_setup()
 sensor_setup()
 
+Volt_Pin.atten(ADC.ATTN_11DB)
+Amps_Pin.atten(ADC.ATTN_11DB)
+try:
+    oled1.flip()
+    oled2.flip()
+    oled1.fill(0)
+    oled2.fill(0)
+    oled1.show()
+    oled2.show()
+except:
+    pass
 
-oled1.fill(0)
-oled2.fill(0)
-oled1.show()
-oled2.show()
+rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler)
 
 # ---------- LOOP ----------
 
 while True:
-
-    dist1 = str(tof_top.read())
-    dist2 = str(tof_front.read())
-    sleep_ms(50)
-    display1.fill(0)
-    display1.text("Display 1", 0, 0, 1)
-    display1.text("Sensor 1", 0, 16, 1)
-    display1.text(dist1, 0, 32, 1)
-    display1.show()
-    display2.fill(0)
-    display2.text("Display 2", 0, 0, 1)
-    display2.text("Sensor 2", 0, 16, 1)
-    display2.text(dist2, 0, 32, 1)
-    display2.show()
+    read_dist_sensors()
+    read_accel()
+    read_rpm()
+    read_batt()
+    refresh_oled()
+    motor_control()
