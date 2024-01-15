@@ -1,10 +1,9 @@
 # ---------- LIBS ----------
 import gc
 from machine import Pin, PWM, ADC, SoftI2C
-from utime import ticks_us, ticks_ms, ticks_diff, sleep_ms, sleep_us 
-import asyncio
+from utime import ticks_us, ticks_diff, sleep_ms 
+import uasyncio as asyncio
 import network
-import gc
 
 from imu import MPU6050
 from vl53l0x import VL53L0X
@@ -12,13 +11,15 @@ import sh1106
 
 # ---------- CHANGABLE VARS ----------
 system_check = 10
-loop = asyncio.get_event_loop()
 
 dist_front = 8190
 dist_top = 8190
 x_gees = 0
 y_gees = 0
 z_gees = 0
+
+dist_top_values = []
+dist_front_values = []
 
 oled1 = 0
 oled2 = 0
@@ -151,120 +152,97 @@ def average(values):
     else:
         return 0
         
-async def read_dist_sensors():
-    while True:
-        global dist_top, dist_front, passed
-        dist_top_values = []
-        dist_front_values = []
-        time = ticks_ms()
-        if (ticks_diff(time, passed) > 50):
-            passed = time   
-            time = ticks_ms()
-            if tof_top_active:
-                try:
-                    dist_top_values.append(int(tof_top.read()))
-                    if len(dist_top_values) >= 5:
-                        dist_top_values.pop(0)
-                    dist_top = average(dist_top_values)
-                except:
-                    system_check -1
-            if tof_front_active:
-                try:
-                    dist_front_values.append(int(tof_front.read()))
-                    if len(dist_front_values) >= 5:
-                        dist_front_values.pop(0)
-                    dist_front = average(dist_front_values)
-                except:
-                    pass
-        else:
-            pass
-        await asyncio.sleep_ms(1)
-
-async def read_accel():
-    while True:
-        global x_gees, y_gees, z_gees
+def read_dist_sensors():
+    global dist_top, dist_front, dist_top_values, dist_front_values
+    if tof_top_active:
         try:
-            x_gees = float(imu.accel.x)
-            y_gees = float(imu.accel.y)
-            z_gees = float(imu.accel.z)
+            dist_top_values.append(int(tof_top.read()))
+            if len(dist_top_values) >= 5:
+                dist_top_values.pop(0)
+            dist_top = average(dist_top_values)
+        except:
+            system_check -1
+    if tof_front_active:
+        try:
+            dist_front_values.append(int(tof_front.read()))
+            if len(dist_front_values) >= 5:
+                dist_front_values.pop(0)
+            dist_front = average(dist_front_values)
         except:
             pass
-        await asyncio.sleep_ms(1)
+
+def read_accel():
+    global x_gees, y_gees, z_gees
+    try:
+        x_gees = float(imu.accel.x)
+        y_gees = float(imu.accel.y)
+        z_gees = float(imu.accel.z)
+    except:
+        pass
+        
+def read_rpm():
+    global rpm, passed, counter
+    time = ticks_us()
+    if (ticks_diff(time, passed) > 500):
+        passed = time   
+        time = ticks_us()
+        rpm = float(counter / 24 * 52 / 13 / 1 * 60)
+        counter = 0
+    else:
+        pass
 
 def interrupt_handler(pin):
     global counter
     counter += 1
-rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler)        
-async def read_rpm():
-    while True:
-        global rpm, passed, counter
-        time = ticks_ms()
-        if (ticks_diff(time, passed) > 500):
-            passed = time   
-            time = ticks_us()
-            rpm = float(counter / 24 * 52 / 13 / 1 * 60)
-            counter = 0
-        else:
-            pass
-        await asyncio.sleep_ms(1)
 
-async def read_batt():
+def read_batt():
     global volts, amps
-    while True:
-        try:
-            v_read = int(Volt_Pin.read())
-            volts = v_read * 5 / (4069/3.3)
-            a_read = int(Volt_Pin.read() )
-            amps = a_read / 2 / 10 / (4069/3.3)
-        except:
-            print("could not read battery status")
-        await asyncio.sleep_ms(1)
+    try:
+        v_read = int(Volt_Pin.read())
+        volts = v_read * 5 / (4069/3.3)
+        a_read = int(Volt_Pin.read() )
+        amps = a_read / 10 / (4069/3.3)
+    except:
+        print("could not read battery status")
         
-async def refresh_oled():
-    while True:
-        oled1.fill(0)
-        oled1.text("Adler Sensoren", 0, 0, 1)
-        oled1.text("Oben:", 0, 16, 1)
-        oled1.text("Vorne:", 0, 32, 1)
-        oled1.text("Beschl.:", 0, 48, 1)
-        data_t = str(dist_top)
-        oled1.text(data_t, 96, 16, 1)
-        data_f = str(dist_front)
-        oled1.text(data_f, 96, 32, 1)
-        data_g = str(x_gees)
-        oled1.text(data_g, 96, 48, 1)
-        oled1.show()
-        
-        oled2.fill(0)
-        oled2.text("Adler Ueberwachung", 0, 0, 1)
-        oled2.text("Spannung:", 0, 16, 1)
-        oled2.text("Strom:", 0, 32, 1)
-        oled2.text("RPM:", 0, 48, 1) 
-        data_v = str(volts)
-        oled2.text(data_v, 80, 16, 1)
-        data_a = str(amps)
-        oled2.text(data_a, 80, 32, 1)
-        data_rpm = str(rpm)
-        oled2.text(data_rpm, 80, 48, 1)    
-        oled2.show()
-        await asyncio.sleep_ms(100)
+def refresh_oled():
+    oled1.fill(0)
+    oled1.text("Adler Sensoren", 0, 0, 1)
+    oled1.text("Oben:", 0, 16, 1)
+    oled1.text("Vorne:", 0, 32, 1)
+    oled1.text("Beschl.:", 0, 48, 1)
+    data_t = str(dist_top)
+    oled1.text(data_t, 96, 16, 1)
+    data_f = str(dist_front)
+    oled1.text(data_f, 96, 32, 1)
+    data_g = str(x_gees)
+    oled1.text(data_g, 96, 48, 1)
+    oled1.show()
     
-async def motor_control():
-    while True:
-        if system_check == 10:
-            if dist_top < 120 and dist_top > 50:
-                pwm_fwd.duty(700)
-            else:
-                pwm_fwd.duty(0)
+    oled2.fill(0)
+    oled2.text("Adler Ueberwachung", 0, 0, 1)
+    oled2.text("Spannung:", 0, 16, 1)
+    oled2.text("Strom:", 0, 32, 1)
+    oled2.text("RPM:", 0, 48, 1) 
+    data_v = str(volts)
+    oled2.text(data_v, 80, 16, 1)
+    data_a = str(amps)
+    oled2.text(data_a, 80, 32, 1)
+    data_rpm = str(rpm)
+    oled2.text(data_rpm, 80, 48, 1)    
+    oled2.show()
+    
+def motor_control():
+    if system_check == 10:
+        if dist_top < 120 and dist_top > 50:
+            pwm_fwd.duty(700)
         else:
             pwm_fwd.duty(0)
-            print("sensor failure")
-        await asyncio.sleep_ms(1)
-        
+    else:
+        pwm_fwd.duty(0)
+        print("sensor failure")
 # ---------- INIT ----------
-gc.enable()
 pwm_fwd.duty(0)
-pwm_rvs.duty(0)
 i2c_SPI_setup()
 sensor_setup()
 
@@ -280,19 +258,16 @@ try:
 except:
     pass
 
+rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler)
+
 # ---------- LOOP ----------
 
-try:
-    loop.create_task(read_dist_sensors())
-    loop.create_task(read_accel())
-    loop.create_task(read_rpm())
-    loop.create_task(read_batt())
-    loop.create_task(refresh_oled())
-    loop.create_task(motor_control())
-    loop.run_forever()
-except Exception as e:
-    print("Error:", e)
-finally:
-    pwm_fwd.duty(0)
-    pwm_rvs.duty(0)
-    loop.close()
+while True:
+    read_dist_sensors()
+    read_accel()
+    read_rpm()
+    read_batt()
+    refresh_oled()
+    motor_control()
+
+    
