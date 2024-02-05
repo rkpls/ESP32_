@@ -174,6 +174,7 @@ def read_dist_sensors():
 def read_accel():
     global x_gees, y_gees, z_gees
     try:
+        timestamp = ticks_us()
         x_gees = float(imu.accel.x)
         y_gees = float(imu.accel.y)
         z_gees = float(imu.accel.z)
@@ -232,15 +233,6 @@ def refresh_oled():
     oled2.text(data_rpm, 80, 48, 1)    
     oled2.show()
     
-def motor_control():
-    if system_check == 10:
-        if dist_top < 120 and dist_top > 50:
-            pwm_fwd.duty(700)
-        else:
-            pwm_fwd.duty(0)
-    else:
-        pwm_fwd.duty(0)
-        print("sensor failure")
 # ---------- INIT ----------
 pwm_fwd.duty(0)
 i2c_SPI_setup()
@@ -263,11 +255,12 @@ rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler)
 # ---------- LOOP ----------
 
 while True:
+    pwm_fwd.duty(0)
+    pwm_rvs.duty(0)
     read_dist_sensors()
     read_accel()
     read_rpm()
     read_batt()
     refresh_oled()
-    motor_control()
 
     

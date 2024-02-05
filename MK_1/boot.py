@@ -69,3 +69,6 @@ def scan_i2c():
 
 i2c_SPI_setup()
 scan_i2c()
+
+
+import main
