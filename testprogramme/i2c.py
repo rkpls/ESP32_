@@ -32,7 +32,7 @@ def scan_i2c():
     if len(devices1) == 0:
         print("No i2c device !")
     else:
-        print('i2c devices found:',len(devices2))
+        print('i2c devices found:',len(devices1))
 
     for device2 in devices2:  
         print("Hex address: ",hex(device2))

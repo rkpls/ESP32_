@@ -5,6 +5,7 @@ from machine import Pin, PWM, ADC, SoftI2C, unique_id
 from utime import ticks_us, ticks_ms, ticks_diff, sleep_ms
 import uasyncio as asyncio
 import network
+from umqtt.simple import MQTTClient
 from ubinascii import hexlify
 from umqtt.simple import MQTTClient
 import json
@@ -22,6 +23,8 @@ wlan = network.WLAN(network.STA_IF)
 MQTT_SERVER = '192.168.137.1'
 CLIENT_ID = hexlify(unique_id())
 MQTT_TOPIC = 'ADL'
+
+start = 0
 
 kp = 0.1            #proportional
 ki = 0.01           #integral
@@ -122,7 +125,20 @@ def connect_wifi():
         wlan.connect(ssid, password)
         while not wlan.isconnected():
             pass
+    print(wlan.ifconfig())
     return wlan
+
+def mqtt_callback(topic, msg):
+    global start
+    print("Received MQTT message. Topic:", topic, "Message:", msg)
+    try:
+        msg_decoded = json.loads(msg)
+        if 'Start' in msg_decoded:
+            start = int(msg_decoded['Start'])
+            print("Start value updated:", start)
+    except Exception as e:
+        print("Error processing MQTT message:", e)
+
 
 def average(values):
     if len(values) > 0:
@@ -203,7 +219,6 @@ async def sensors():
     while True:
         time = ticks_ms()
         if (ticks_diff(time, passed) > 100):
-            print("sensor update")
             try:
                 dist_top_values.append(int(tof_top.read()))
                 if len(dist_top_values) >= 5:
@@ -240,32 +255,30 @@ async def sensors():
 
 
 async def motor_control():
-    
-    global dist_top, dist_front, pwm_fwd, pwm_rvs, rpm, prev_error, integral
+    global start, dist_top, dist_front, pwm_fwd, pwm_rvs, rpm, prev_error, integral
     pwm_freq = 200
-    rpm_slow = 500
-    rpm_fast = 1000
     pwm_fwd.freq(pwm_freq)
     pwm_rvs.freq(pwm_freq)
     while True:
-        if dist_top > 200:
-            if dist_front < 500:
-                target_rpm = rpm_slow
-            else:
-                target_rpm = rpm_fast
-        target_rpm = min(target_rpm, max_setpoint)
-        error = target_rpm - rpm
-        proportional = kp * error
-        integral += ki * error
-        derivative = kd * (error - prev_error)
-        output = proportional + integral + derivative
-        prev_error = error
-        if output > 0:
-            pwm_rvs.duty(0)
-            pwm_fwd.duty(int(output))
-        else:
-            pwm_fwd.duty(0)
-            pwm_rvs.duty(int(-output))
+        if start == 1:
+            power = 0
+            while dist_top >= 200:
+                for power in range(800,10):
+                    pwm_fwd.duty(power)
+                pwm_fwd.duty(power)
+            while dist_top <= 200:
+                if dist_front <= 400:
+                    for power in range(800, 400, -50):
+                        pwm_fwd.duty(power)
+                if dist_front > 400:
+                    for power in range(400, 800, 50):
+                        pwm_fwd.duty(power)
+                if dist_top > 200:
+                    for power in range(800, 0, -100):
+                        pwm_fwd.duty(power)
+                else:
+                    pass
+        pwm_fwd.duty(0)
         await asyncio.sleep_ms(10)
 
 
@@ -340,6 +353,11 @@ async def display2():
 
 connect_wifi()
 gc.enable()
+# Connect to MQTT broker
+client = MQTTClient(CLIENT_ID, MQTT_SERVER)
+client.set_callback(mqtt_callback)
+client.connect()
+client.subscribe(MQTT_TOPIC)
 
 # ---------- LOOP ----------
 
@@ -349,8 +367,8 @@ try:
     loop.create_task(monitoring_send())
     loop.create_task(sensors())
     loop.create_task(motor_control())
-    loop.create_task(display1())
-    loop.create_task(display2())
+    #loop.create_task(display1())
+    #loop.create_task(display2())
     loop.run_forever()
 except Exception as e:
     print("Error:", e)
