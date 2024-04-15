@@ -21,7 +21,7 @@ password = 'Micropython'
 wlan = network.WLAN(network.STA_IF)
 MQTT_SERVER = '192.168.137.1'
 CLIENT_ID = hexlify(unique_id())
-MQTT_TOPIC = 'ADL'
+MQTT_TOPIC = 'ADL/*'
 
 kp = 0.1            #proportional
 ki = 0.01           #integral
@@ -50,6 +50,7 @@ y_gees = 0
 z_gees = 0
 volts = 0
 amps = 0
+rps = 0
 revtime = []
 passed = ticks_ms()
 
@@ -77,10 +78,10 @@ pin_SDA5 = 8                                              # !!!! I2C DATA BUS SD
 pin_SCL5 = 9                                              # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
 
 #pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
-pin_FWD = 11                                              # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
+pin_FWD = 12                                              # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
 pwm_fwd = PWM(pin_FWD)
 pwm_fwd.duty(0)
-pin_RVS = 12                                              # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
+pin_RVS = 11                                              # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
 pwm_rvs = PWM(pin_RVS)
 pwm_rvs.duty(0)
 #pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
@@ -128,7 +129,7 @@ def average(values):
     if len(values) > 0:
         return sum(values) / len(values)
     else:
-        return 0
+        return 1
     
 def interrupt_handler():
     global revtime
@@ -167,7 +168,7 @@ async def monitoring_send(server = MQTT_SERVER):
         passed = time
 
 async def sensors():
-    global passed, dist_top, dist_front, x_gees, y_gees, z_gees, volts, amps, rpm
+    global passed, dist_top, dist_front, x_gees, y_gees, z_gees, volts, amps, rps
     dist_front = 8190
     dist_top = 8190
     dist_top_values = []
@@ -203,7 +204,6 @@ async def sensors():
     while True:
         time = ticks_ms()
         if (ticks_diff(time, passed) > 100):
-            print("sensor update")
             try:
                 dist_top_values.append(int(tof_top.read()))
                 if len(dist_top_values) >= 5:
@@ -218,6 +218,7 @@ async def sensors():
                 dist_front = average(dist_front_values)
             except:
                 print("NO TOF FRONT")
+            """
             try:
                 x_gees = float(round(imu.accel.x, 1))
                 y_gees = float(round(imu.accel.y, 1))
@@ -234,7 +235,7 @@ async def sensors():
 
             rps = round(float(ticks_diff(time, passed)*1000 / average(revtime) * 60), 2)
             revtime.clear()
-
+            """
             await asyncio.sleep_ms(50)
             passed = time
 
@@ -243,29 +244,17 @@ async def motor_control():
     
     global dist_top, dist_front, pwm_fwd, pwm_rvs, rpm, prev_error, integral
     pwm_freq = 200
-    rpm_slow = 500
+    rpm_slow = 700
     rpm_fast = 1000
     pwm_fwd.freq(pwm_freq)
     pwm_rvs.freq(pwm_freq)
     while True:
-        if dist_top > 200:
-            if dist_front < 500:
-                target_rpm = rpm_slow
-            else:
-                target_rpm = rpm_fast
-        target_rpm = min(target_rpm, max_setpoint)
-        error = target_rpm - rpm
-        proportional = kp * error
-        integral += ki * error
-        derivative = kd * (error - prev_error)
-        output = proportional + integral + derivative
-        prev_error = error
-        if output > 0:
+        if dist_top < 200:
             pwm_rvs.duty(0)
-            pwm_fwd.duty(int(output))
+            pwm_fwd.duty(rpm_fast)
         else:
             pwm_fwd.duty(0)
-            pwm_rvs.duty(int(-output))
+            pwm_rvs.duty(0)
         await asyncio.sleep_ms(10)
 
 
@@ -283,7 +272,6 @@ async def display1():
     while True:
         time = ticks_ms()
         interval = 250
-        print("display update")
         if (ticks_diff(time, passed) > interval):
             global dist_top, dist_front, x_gees
             oled1.fill(0)
@@ -316,7 +304,6 @@ async def display2():
     while True:
         time = ticks_ms()
         interval = 250
-        print("display update")
         if (ticks_diff(time, passed) > interval):
             global volts, amps, rpm
             
@@ -338,7 +325,7 @@ async def display2():
 
 # ---------- SETUP ----------
 
-connect_wifi()
+#connect_wifi()
 gc.enable()
 
 # ---------- LOOP ----------
@@ -346,7 +333,7 @@ gc.enable()
 rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler)
 
 try:
-    loop.create_task(monitoring_send())
+    #loop.create_task(monitoring_send())
     loop.create_task(sensors())
     loop.create_task(motor_control())
     loop.create_task(display1())
@@ -358,3 +345,5 @@ finally:
     pwm_fwd.duty(0)
     pwm_rvs.duty(0)
     loop.close()
+
+

@@ -13,8 +13,8 @@ pin_SDA3 = 15
 pin_SCL3 = 16
 pin_SDA4 = 17
 pin_SCL4 = 18
-pin_SDA5 = 8
-pin_SCL5 = 9
+pin_SDA5 = 9
+pin_SCL5 = 8
 
 width=128
 height=64

@@ -9,8 +9,8 @@ pin_SDA3 = 15
 pin_SCL3 = 16
 pin_SDA4 = 17
 pin_SCL4 = 18
-pin_SDA5 = 8
-pin_SCL5 = 9
+pin_SDA5 = 9
+pin_SCL5 = 8
 
 
 i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
