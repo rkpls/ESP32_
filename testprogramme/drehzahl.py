@@ -11,11 +11,9 @@ pin_RVS = 11
 pwm_rvs = PWM(pin_RVS)
 pwm_rvs.duty(0)
 
-
 pwm_fwd.freq(200)
 pwm_rvs.freq(200)
 
-passed = ticks_us()
 counter = 0
 
 def interrupt_handler(pin):

@@ -47,14 +47,15 @@ revtime = []
 passed = ticks_ms()
 
 status = False
+anfahrt_aktiv = False
 durchfahrt_aktiv = False
-anfahrt = False
+bremsung_aktiv = False
 
 pwm_freq = 1000                             #
 target_rpm = 0                              #value for manual or calculated input (RPM)
 output = 0                                  #value useed by the PID controller
-target_rpm = 0
 current_rpm = 0                             #value for sensor reading (RPM)
+revcounter = 0
 
 kp = 0.1                                    #proportional
 ki = 0.01                                   #integral
@@ -83,10 +84,10 @@ pin_SDA5 = 8                                              # !!!! I2C DATA BUS SD
 pin_SCL5 = 9                                              # !!!! I2C DATA BUS SCL !! used for Gyro SCK/SCL/SCLK
 
 #pin_CS = 10                                              # !! SS Pin (CS/SS Pin on slave)
-pin_FWD = 11                                              # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
+pin_FWD = 12                                              # !! Mosi Pin (MOSI/SDI on slave) (Master OUT Slave IN)
 pwm_fwd = PWM(pin_FWD)
 pwm_fwd.duty(0)
-pin_RVS = 12                                              # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
+pin_RVS = 11                                              # !! Miso Pin (MISO/SDO on slave) (Master IN Slave OUT) 
 pwm_rvs = PWM(pin_RVS)
 pwm_rvs.duty(0)
 #pin_SCK = 13                                             # !! SCK Pin (SCK/SCL/SCLK Pin on slave)
@@ -96,8 +97,8 @@ rpm_pin_14 = Pin(14, Pin.IN)
 #Pin_TX = 44				#dont use
 pin_SDA1 = 1
 pin_SCL1 = 2
-trg_pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
-echo_pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
+#trg_pin_42 = 42                                                # MTMS (Master Test Mode Select) JTAG (Joint Test Action Group) Debugging and overwriting internal registry
+#echo_pin_41 = 41                                                # MTDI (Master Test Data Input) JTAG
 #pin_40 = 40                                                # MTDO (Master Test Data Output) JTAG
 #pin_39 = 39                                                # MTCK (Master Test Clock Signal) JTAG
 #pin_builtin_LED = Pin(38, Pin.OUT)
@@ -135,7 +136,6 @@ def mqtt_callback(topic, msg):
     global status
     print("Received MQTT message:", msg.decode())
     status = True
-    print(status)
 
 def average(values):
     if len(values) > 0:
@@ -149,12 +149,16 @@ def interrupt_handler():
     revtime.append(round(ticks_diff(now, last), 4))
     last = now
 
+def interrupt_handler_rpm(pin):
+    global revcounter
+    revcounter += 1
+
 # ---------- THREAD DEF ----------
 
 async def monitoring_send(server = MQTT_SERVER): 
     global passed, CLIENT_ID, MQTT_SERVER, MQTT_TOPIC, x_gees, volts, amps, rpm
     passed = ticks_ms()
-    interval = 1000
+    interval = 500
     while True:
         time = ticks_ms()
         if (ticks_diff(time, passed) > interval):
@@ -178,45 +182,42 @@ async def monitoring_send(server = MQTT_SERVER):
                 pass
             
             passed = time
-        await asyncio.sleep_ms(500)
+        await asyncio.sleep_ms(10)
 
 async def abfahrt():
-    global status, target_rpm, anfahrt, durchfahrt_aktiv
-    interval = 100
+    global status, target_rpm, anfahrt_aktiv, durchfahrt_aktiv, bremsung_aktiv
+    interval = 50
     passed = ticks_ms()
     while True:
         time = ticks_ms()
         if (ticks_diff(time, passed) > interval):
             
             if status == True:
-                anfahrt = True
-                target_rpm = 300
-                print("Anfahrt")
-            else:
-                print("ende")
-                target_rpm = 0
-                reset()
-                
-            if dist_top <= 400 and anfahrt == True:
                 status = False
-                anfahrt = False
-                if dist_front > 200:
-                    target_rpm = 400
-                    print("set 400")
-                if dist_front <= 200:
-                    target_rpm = 200
-                    print("set 200")
+                anfahrt_aktiv = True
+            
+            if anfahrt_aktiv == True:
+                target_rpm = 300
+                
+            if anfahrt_aktiv == True and dist_top < 200:
+                anfahrt_aktiv = False
                 durchfahrt_aktiv = True
-                    
-            if dist_top > 400 and durchfahrt_aktiv == True:
+                
+            if  durchfahrt_aktiv == True:
+                if dist_front > 100:
+                    target_rpm = 400
+                if dist_front <= 100:
+                    target_rpm = 200
+
+            if durchfahrt_aktiv == True and dist_top > 200:
                 durchfahrt_aktiv = False
-                pwm_fwd.duty(0)
-                pwm_rvs.duty(0)
+                bremsung_aktiv = True
+               
+            if  bremsung_aktiv == True:
                 target_rpm = 0
-                print("Bremsung")
         
             passed = time
-        await asyncio.sleep_ms(200)
+        await asyncio.sleep_ms(10)
 
 async def sensors():
     global dist_top, dist_front, x_gees, y_gees, z_gees, volts, amps, rpm
@@ -227,7 +228,7 @@ async def sensors():
     x_gees = 0
     y_gees = 0
     z_gees = 0
-    
+
     i2c3 = SoftI2C(scl=Pin(pin_SCL3), sda=Pin(pin_SDA3), freq=100000)
     i2c4 = SoftI2C(scl=Pin(pin_SCL4), sda=Pin(pin_SDA4), freq=100000)
     i2c5 = SoftI2C(scl=Pin(pin_SCL5), sda=Pin(pin_SDA5), freq=100000)
@@ -252,22 +253,27 @@ async def sensors():
         print("could not innit imu")        
     Volt_Pin.atten(ADC.ATTN_11DB)
     Amps_Pin.atten(ADC.ATTN_11DB)
-    
+
     passed = ticks_ms()
     while True:
-        interval = 100
+        interval = 50
         time = ticks_ms()
         if (ticks_diff(time, passed) > interval):
             try:
+                rpm = round(float(revcounter / 24 * 52 / 13 / 1 * 60),1)
+                revcounter = 0
+            except:
+                print("no rpm reading")
+            try:
                 dist_top_values.append(int(tof_top.read()))
-                if len(dist_top_values) >= 5:
+                if len(dist_top_values) > 3:
                     dist_top_values.pop(0)
                 dist_top = average(dist_top_values)
             except:
                 print("NO TOF TOP")
             try:
                 dist_front_values.append(int(tof_front.read()))
-                if len(dist_front_values) >= 5:
+                if len(dist_front_values) > 3:
                     dist_front_values.pop(0)
                 dist_front = average(dist_front_values)
             except:
@@ -286,10 +292,11 @@ async def sensors():
             except:
                 print("NO BATTERY")
             passed = time
-        await asyncio.sleep_ms(100)
+        await asyncio.sleep_ms(10)
 
 async def motor_control():
     global dist_top, dist_front, pwm_fwd, pwm_rvs, rpm, prev_error, integral, target_rpm
+    pwm_freq = 1000
     pwm_fwd.freq(pwm_freq)
     pwm_rvs.freq(pwm_freq)
     passed = ticks_ms()
@@ -297,11 +304,25 @@ async def motor_control():
         time = ticks_ms()
         interval = 50
         if (ticks_diff(time, passed) > interval):
-            duty = target_rpm * 2
+            duty = int(target_rpm * 1)
             pwm_fwd.duty(duty)
             pwm_rvs.duty(0)
+            print(duty)
             passed = time
-        await asyncio.sleep_ms(100)
+        await asyncio.sleep_ms(10)
+        
+"""
+Duty 300: 200rpm (minimum)
+Duty 400: 260rpm
+Duty 500: 300rpm
+Duty 600: 330rpm 
+Duty 800: 370rpm 
+Duty 1000: 400rpm
+
+Unter starker last: 
+Duty 600: 250rpm 
+Duty 800: 300rpm
+"""      
 
 async def display1():
     i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
@@ -317,23 +338,22 @@ async def display1():
         global dist_top, dist_front, x_gees
         time = ticks_ms()
         interval = 250
-        if  durchfahrt_aktiv == False:
-            if (ticks_diff(time, passed) > interval) and durchfahrt_aktiv == False:            
-                oled1.fill(0)
-                oled1.text("Adler Sensoren", 0, 0, 1)
-                oled1.text("Oben:", 0, 16, 1)
-                oled1.text("Vorne:", 0, 32, 1)
-                oled1.text("Beschl.:", 0, 48, 1)
-                data_t = str(dist_top)
-                oled1.text(data_t, 96, 16, 1)
-                data_f = str(dist_front)
-                oled1.text(data_f, 96, 32, 1)
-                data_g = str(x_gees)
-                oled1.text(data_g, 96, 48, 1)
-                oled1.show()
-                
-                passed = time
-        await asyncio.sleep_ms(200)
+        if (ticks_diff(time, passed) > interval) and (anfahrt_aktiv == False or durchfahrt_aktiv == False):
+            oled1.fill(0)
+            oled1.text("Adler Sensoren", 0, 0, 1)
+            oled1.text("Oben:", 0, 16, 1)
+            oled1.text("Vorne:", 0, 32, 1)
+            oled1.text("Beschl.:", 0, 48, 1)
+            data_t = str(dist_top)
+            oled1.text(data_t, 96, 16, 1)
+            data_f = str(dist_front)
+            oled1.text(data_f, 96, 32, 1)
+            data_g = str(x_gees)
+            oled1.text(data_g, 96, 48, 1)
+            oled1.show()
+            
+            passed = time
+        await asyncio.sleep_ms(10)
             
 async def display2():
     i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
@@ -349,30 +369,30 @@ async def display2():
         global volts, amps, rpm
         time = ticks_ms()
         interval = 250
-        if  durchfahrt_aktiv == False:
-            if (ticks_diff(time, passed) > interval):       
-                oled2.fill(0)
-                oled2.text("Adler Ueberwachung", 0, 0, 1)
-                oled2.text("Spannung:", 0, 16, 1)
-                oled2.text("Strom:", 0, 32, 1)
-                oled2.text("RPM:", 0, 48, 1) 
-                data_v = str(volts)
-                oled2.text(data_v, 80, 16, 1)
-                data_a = str(amps)
-                oled2.text(data_a, 80, 32, 1)
-                data_rpm = str(rpm)
-                oled2.text(data_rpm, 80, 48, 1)    
-                oled2.show()
+        if (ticks_diff(time, passed) > interval) and (anfahrt_aktiv == False or durchfahrt_aktiv == False):
+            oled2.fill(0)
+            oled2.text("Adler Ueberwachung", 0, 0, 1)
+            oled2.text("Spannung:", 0, 16, 1)
+            oled2.text("Strom:", 0, 32, 1)
+            oled2.text("RPM:", 0, 48, 1) 
+            data_v = str(volts)
+            oled2.text(data_v, 80, 16, 1)
+            data_a = str(amps)
+            oled2.text(data_a, 80, 32, 1)
+            data_rpm = str(rpm)
+            oled2.text(data_rpm, 80, 48, 1)    
+            oled2.show()
                 
-                passed = time
-        await asyncio.sleep_ms(200)
+            passed = time
+        await asyncio.sleep_ms(10)
 
 # ---------- STARTUP ----------
 
 connect_wifi()
 gc.enable()
 
-rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler)
+rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler_rpm)
+
 print("warten auf mqtt input an adler/status/#")
 client = MQTTClient(CLIENT_ID, MQTT_SERVER)
 client.connect()
@@ -387,10 +407,10 @@ sleep_ms(5000)
 
 try:
     loop.create_task(sensors())
-    loop.create_task(motor_control())
-    loop.create_task(display1())
-    loop.create_task(display2())
+    #loop.create_task(display1())
+    #loop.create_task(display2())
     loop.create_task(abfahrt())
+    loop.create_task(motor_control())
     loop.create_task(monitoring_send())
     loop.run_forever()
 
