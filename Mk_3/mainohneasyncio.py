@@ -22,15 +22,12 @@ MQTT_TOPIC = 'adler/data/*'
 MQTT_RECEIVE_TOPIC = 'adler/status/#'
 
 # ---------- DATA ----------
-volts = float(0.00)                         #
-amps = float(0.00)                          #
-watts = float(0.00)                         #
+volts = float(0.00)
+amps = float(0.00)
 g_force_x = int(0)                          #convert to 0-1000 mm/s^2 = 1 m/s^2
-g_force_y = int(0)                          # ""
-g_force_z = int(0)                          # ""
-v_calc = float(0.00)                        # geschwindigkeit mit sensor
-v_wheel = float(0.00)                       # geschwindigkeit aus drehzahl
-rpm = float(0.00)                     		#
+g_force_y = int(0)
+g_force_z = int(0)
+rpm = float(0.00)
 
 # ---------- VARS ----------
 dist_top = 0
@@ -47,18 +44,8 @@ anfahrt_aktiv = False
 durchfahrt_aktiv = False
 bremsung_aktiv = False
 ende = False
-pwm_freq = 1000                             #
-target_rpm = 0                              #value for manual or calculated input (RPM)
-output = 0                                  #value useed by the PID controller
-current_rpm = 0                             #value for sensor reading (RPM)
+pwm_freq = 1000
 revcounter = 0
-kp = 0.1                                    #proportional
-ki = 0.01                                   #integral
-kd = 0.01                                   #derivative
-prev_error = 0
-integral = 0
-base_setpoint = 100
-max_setpoint = 400                         # Maximum prm
 dist_front = 8190
 dist_top = 8190
 dist_top_values = []
@@ -89,6 +76,14 @@ pwm_fwd = PWM(pin_FWD)
 pwm_fwd.duty(0)
 pwm_rvs = PWM(pin_RVS)
 pwm_rvs.duty(0)
+pwm_freq = 1000
+pwm_fwd.freq(pwm_freq)
+pwm_rvs.freq(pwm_freq)
+kp = 0.5
+ki = 0.1
+kd = 0.2
+setpoint_rpm = 1000
+pid = PIDController(kp, ki, kd, setpoint_rpm)
 i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
 oled1 = sh1106.SH1106_I2C(128, 64, i2c1, Pin(0), 0x3c)                              #rechts
 oled1.flip()
@@ -115,7 +110,7 @@ Volt_Pin.atten(ADC.ATTN_11DB)
 Amps_Pin.atten(ADC.ATTN_11DB)
 
 # ----------- DEFS ----------
-def connect_wifi():                                         #fn für WLAN
+def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
@@ -158,6 +153,23 @@ def idle_loop_1sec():
         display2()
         passed = time
 
+class PIDController:
+    def __init__(self, kp, ki, kd, setpoint):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.setpoint = setpoint
+        self.prev_error = 0
+        self.integral = 0
+
+    def compute(self, feedback_value):
+        error = self.setpoint - feedback_value
+        self.integral += error
+        derivative = error - self.prev_error
+        output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        self.prev_error = error
+        return output
+
 # ---------- THREAD DEF ----------
 def system_check():
     global system
@@ -178,12 +190,20 @@ def monitoring_send(server = MQTT_SERVER):
             sys.stdout.buffer.seek(0)
             client = MQTTClient(CLIENT_ID, MQTT_SERVER)
             client.connect()
-            data = {'logs': str(last_logs),'Volt:': str(volts),'Amps': str(amps),'Rpm': str(rpm),'Accel': str(x_gees)}
+            data = {'logs': str(last_logs),
+                    'Volt:': str(volts),
+                    'Amps': str(amps),
+                    'Rpm': str(rpm),
+                    'Accelx': str(x_gees),
+                    'Accely': str(y_gees),
+                    'Accelz': str(z_gees),
+                    'DistT': str(dist_top),
+                    'DistF': str(dist_front)}
             dump = json.dumps(data)
             client.publish(MQTT_TOPIC, dump)
             client.disconnect()
         except:
-            pass    
+            print("connection to mqqt broker failed")
         passed = time
         
 def abfahrt():
@@ -240,13 +260,12 @@ def sensors():
         passed = time
 
 def motor_control():
-    pwm_freq = 1000
-    pwm_fwd.freq(pwm_freq)
-    pwm_rvs.freq(pwm_freq)
+    global pwm_output
     passed = ticks_ms()
     time = ticks_ms()
     interval = 50
     if (ticks_diff(time, passed) > interval):
+        pwm_output = pid.compute(rpm)
         duty = int(target_rpm * 1)
         pwm_fwd.duty(duty)
         pwm_rvs.duty(0)
