@@ -319,9 +319,9 @@ async def motor_control():
         time = ticks_ms()
         interval = 50
         if (ticks_diff(time, passed) > interval):
-            #pwm_output = pid.compute(rpm)
-            #duty = int(pwm_output)
-            pwm_fwd.duty(target_rpm)
+            pwm_output = pid.compute(rpm)
+            duty = int(pwm_output)
+            pwm_fwd.duty(duty)
             pwm_rvs.duty(0)
             passed = time
         await asyncio.sleep_ms(1)
@@ -400,8 +400,6 @@ client.set_callback(mqtt_callback)
 client.subscribe(MQTT_RECEIVE_TOPIC)
 client.wait_msg()
 client.disconnect()
-
-
 
 rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler_rpm)
 pid = PIDController(kp, ki, kd, setpoint_rpm)

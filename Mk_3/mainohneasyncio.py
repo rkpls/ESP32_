@@ -175,7 +175,6 @@ def monitoring_send(server = MQTT_SERVER):
             'DistF': str(dist_front)}
     dump = json.dumps(data)
     client.publish(MQTT_TOPIC, dump)
-
         
 def abfahrt():
     global status, target_rpm, anfahrt_aktiv, durchfahrt_aktiv, bremsung_aktiv, ende
@@ -183,15 +182,15 @@ def abfahrt():
         status = False
         anfahrt_aktiv = True
     if anfahrt_aktiv == True:
-        target_rpm = 300
+        target_rpm = 600
     if anfahrt_aktiv == True and dist_top < 200:
         anfahrt_aktiv = False
         durchfahrt_aktiv = True
     if  durchfahrt_aktiv == True:
         if dist_front > 100:
-            target_rpm = 400
+            target_rpm = 800
         if dist_front <= 100:
-            target_rpm = 200
+            target_rpm = 400
     if durchfahrt_aktiv == True and dist_top > 200:
         durchfahrt_aktiv = False
         bremsung_aktiv = True       
@@ -222,9 +221,9 @@ def sensors():
         print("Sensor Error")
 
 def motor_control():
-    #global pwm_output
-    #pwm_output = pid.compute(rpm)
-    duty = int(target_rpm * 1)
+    global pwm_output
+    pwm_output = pid.compute(rpm)
+    duty = int(pwm_output)
     pwm_fwd.duty(duty)
     pwm_rvs.duty(0)
 
