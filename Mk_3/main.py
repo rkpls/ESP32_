@@ -16,31 +16,34 @@ import sh1106
 loop = asyncio.get_event_loop()
 # ---------- CHANGABLE VARS ----------
 
-ssid = 'Zenbook-14-Pals'
-password = 'Micropython'
+#ssid = 'Zenbook-14-Pals'
+#password = 'Micropython'
+#MQTT_SERVER = '192.168.137.1'
+
 wlan = network.WLAN(network.STA_IF)
-MQTT_SERVER = '192.168.137.1'
 CLIENT_ID = hexlify(unique_id())
-MQTT_TOPIC = 'adler/data/*'
-MQTT_RECEIVE_TOPIC = 'adler/status/#'
+MQTT_TOPIC = 'adler/data'
+MQTT_RECEIVE_TOPIC = 'adler/status'
+
+ssid = 'DAVE'
+password = '1234567890'
+MQTT_SERVER = '192.168.137.1'
 
 # ---------- DATA ----------
 volts = float(0.00)                         #
 amps = float(0.00)                          #
 watts = float(0.00)                         #
 g_force_x = int(0)                          #convert to 0-1000 mm/s^2 = 1 m/s^2
-g_force_y = int(0)                          # ""
-g_force_z = int(0)                          # ""
 v_calc = float(0.00)                        # geschwindigkeit mit sensor
 v_wheel = float(0.00)                       # geschwindigkeit aus drehzahl
 rpm = float(0.00)                     		#
 
 # ---------- VARS ----------
-dist_top = 0
-dist_front = 0
+dist_top = 500
+dist_front = 500
+dist_top_values = []
+dist_front_values = []
 x_gees = 0
-y_gees = 0
-z_gees = 0
 volts = 0
 amps = 0
 revtime = []
@@ -56,17 +59,14 @@ target_rpm = 0                              #value for manual or calculated inpu
 output = 0                                  #value useed by the PID controller
 current_rpm = 0                             #value for sensor reading (RPM)
 revcounter = 0
+revstotal = 0
 
-kp = 0.1                                    #proportional
-ki = 0.01                                   #integral
-kd = 0.01                                   #derivative
-prev_error = 0
-integral = 0
-base_setpoint = 100
-max_setpoint = 400                         # Maximum prm
+kp = 0.5
+ki = 0.1
+kd = 0.2
+setpoint_rpm = 1000
 
 # ---------- PINS ----------
-# --------------------------
 
 Volt_Pin = ADC(Pin(4))                      #0.2V per V
 Amps_Pin = ADC(Pin(5))                      #0.1V per A
@@ -137,52 +137,67 @@ def mqtt_callback(topic, msg):
     print("Received MQTT message:", msg.decode())
     status = True
 
+def system_check():
+    global system
+    if volts < 8 or amps > 10:
+        system = False
+    else:
+        system = True
+
 def average(values):
     if len(values) > 0:
         return sum(values) / len(values)
     else:
         return 1
-    
-def interrupt_handler():
-    global revtime
-    now = ticks_us()
-    revtime.append(round(ticks_diff(now, last), 4))
-    last = now
 
 def interrupt_handler_rpm(pin):
-    global revcounter
+    global revcounter, revstotal
     revcounter += 1
+    revstotal += 1
+
+class PIDController:
+    def __init__(self, kp, ki, kd, setpoint):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.setpoint = setpoint
+        self.prev_error = 0
+        self.integral = 0
+
+    def compute(self, feedback_value):
+        error = self.setpoint - feedback_value
+        self.integral += error
+        derivative = error - self.prev_error
+        output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        self.prev_error = error
+        return output
 
 # ---------- THREAD DEF ----------
 
-async def monitoring_send(server = MQTT_SERVER): 
+async def monitoring_send(server = MQTT_SERVER):
     global passed, CLIENT_ID, MQTT_SERVER, MQTT_TOPIC, x_gees, volts, amps, rpm
     passed = ticks_ms()
     interval = 500
+    client = MQTTClient(CLIENT_ID, MQTT_SERVER)
     while True:
         time = ticks_ms()
         if (ticks_diff(time, passed) > interval):
-            try:
-                last_logs = sys.stdout.buffer.getvalue().decode().split('\n')
-                sys.stdout.buffer.truncate(0)
-                sys.stdout.buffer.seek(0)
-                client = MQTTClient(CLIENT_ID, MQTT_SERVER)
-                client.connect()
-                data = {
-                    'logs': str(last_logs),
-                    'Volt:': str(volts),
+            client.connect()
+            data = {
+                    'Volt': str(volts),
                     'Amps': str(amps),
+                    'Watt': str(volts * amps),
                     'Rpm': str(rpm),
-                    'Accel': str(x_gees)
+                    'Accelx': str(x_gees),
+                    'DistT': str(dist_top),
+                    'DistF': str(dist_front),
+                    'Rtot': str(revstotal)
                     }
-                dump = json.dumps(data)
-                client.publish(MQTT_TOPIC, dump)
-                client.disconnect()
-            except:
-                pass
-            
+            dump = json.dumps(data)
+            client.publish(MQTT_TOPIC, dump)
+            client.disconnect() 
             passed = time
-        await asyncio.sleep_ms(10)
+        await asyncio.sleep_ms(1)
 
 async def abfahrt():
     global status, target_rpm, anfahrt_aktiv, durchfahrt_aktiv, bremsung_aktiv
@@ -197,7 +212,7 @@ async def abfahrt():
                 anfahrt_aktiv = True
             
             if anfahrt_aktiv == True:
-                target_rpm = 300
+                target_rpm = 600
                 
             if anfahrt_aktiv == True and dist_top < 200:
                 anfahrt_aktiv = False
@@ -205,9 +220,9 @@ async def abfahrt():
                 
             if  durchfahrt_aktiv == True:
                 if dist_front > 100:
-                    target_rpm = 400
+                    target_rpm = 800
                 if dist_front <= 100:
-                    target_rpm = 200
+                    target_rpm = 400
 
             if durchfahrt_aktiv == True and dist_top > 200:
                 durchfahrt_aktiv = False
@@ -217,7 +232,7 @@ async def abfahrt():
                 target_rpm = 0
         
             passed = time
-        await asyncio.sleep_ms(10)
+        await asyncio.sleep_ms(1)
 
 async def sensors():
     global dist_top, dist_front, x_gees, y_gees, z_gees, volts, amps, rpm
@@ -260,28 +275,28 @@ async def sensors():
         time = ticks_ms()
         if (ticks_diff(time, passed) > interval):
             try:
-                rpm = round(float(revcounter / 24 * 52 / 13 / 1 * 60),1)
+                rpm = int(revcounter / 13 * 54 / 4 / 50 * 1000 * 60)
                 revcounter = 0
             except:
                 print("no rpm reading")
             try:
-                dist_top_values.append(int(tof_top.read()))
-                if len(dist_top_values) > 3:
-                    dist_top_values.pop(0)
-                dist_top = average(dist_top_values)
+                dt = int(tof_top.read())
+                if dt <= 500:
+                    dist_top = dt
+                else:
+                    dist_top = 500
             except:
                 print("NO TOF TOP")
             try:
-                dist_front_values.append(int(tof_front.read()))
-                if len(dist_front_values) > 3:
-                    dist_front_values.pop(0)
-                dist_front = average(dist_front_values)
+                df = int(tof_front.read())
+                if df <= 500:
+                    dist_front = df
+                else:
+                    dist_front = 500
             except:
                 print("NO TOF FRONT")
             try:
                 x_gees = float(round(imu.accel.x, 1))
-                y_gees = float(round(imu.accel.y, 1))
-                z_gees = float(round(imu.accel.z, 1))
             except:
                 print("NO IMU")
             try:
@@ -292,7 +307,7 @@ async def sensors():
             except:
                 print("NO BATTERY")
             passed = time
-        await asyncio.sleep_ms(10)
+        await asyncio.sleep_ms(1)
 
 async def motor_control():
     global dist_top, dist_front, pwm_fwd, pwm_rvs, rpm, prev_error, integral, target_rpm
@@ -304,25 +319,12 @@ async def motor_control():
         time = ticks_ms()
         interval = 50
         if (ticks_diff(time, passed) > interval):
-            duty = int(target_rpm * 1)
-            pwm_fwd.duty(duty)
+            #pwm_output = pid.compute(rpm)
+            #duty = int(pwm_output)
+            pwm_fwd.duty(target_rpm)
             pwm_rvs.duty(0)
-            print(duty)
             passed = time
-        await asyncio.sleep_ms(10)
-        
-"""
-Duty 300: 200rpm (minimum)
-Duty 400: 260rpm
-Duty 500: 300rpm
-Duty 600: 330rpm 
-Duty 800: 370rpm 
-Duty 1000: 400rpm
-
-Unter starker last: 
-Duty 600: 250rpm 
-Duty 800: 300rpm
-"""      
+        await asyncio.sleep_ms(1)
 
 async def display1():
     i2c1 = SoftI2C(scl=Pin(pin_SCL1), sda=Pin(pin_SDA1), freq=100000)
@@ -353,7 +355,7 @@ async def display1():
             oled1.show()
             
             passed = time
-        await asyncio.sleep_ms(10)
+        await asyncio.sleep_ms(1)
             
 async def display2():
     i2c2 = SoftI2C(scl=Pin(pin_SCL2), sda=Pin(pin_SDA2), freq=100000)
@@ -384,34 +386,37 @@ async def display2():
             oled2.show()
                 
             passed = time
-        await asyncio.sleep_ms(10)
+        await asyncio.sleep_ms(1)
 
 # ---------- STARTUP ----------
 
 connect_wifi()
 gc.enable()
 
-rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler_rpm)
-
-print("warten auf mqtt input an adler/status/#")
+print("warten auf mqtt input an adler/status")
 client = MQTTClient(CLIENT_ID, MQTT_SERVER)
 client.connect()
 client.set_callback(mqtt_callback)
 client.subscribe(MQTT_RECEIVE_TOPIC)
 client.wait_msg()
+client.disconnect()
 
-print("starte in 5 sekunden")
-sleep_ms(5000)
+
+
+rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler_rpm)
+pid = PIDController(kp, ki, kd, setpoint_rpm)
 
 # ---------- LOOP ----------
 
 try:
     loop.create_task(sensors())
-    #loop.create_task(display1())
-    #loop.create_task(display2())
+    loop.create_task(display1())
+    loop.create_task(display2())
+    loop.create_task(monitoring_send())
+    print("starte in 2 sekunden")
+    sleep_ms(2000)
     loop.create_task(abfahrt())
     loop.create_task(motor_control())
-    loop.create_task(monitoring_send())
     loop.run_forever()
 
 except Exception as e:
@@ -421,6 +426,8 @@ finally:
     pwm_fwd.duty(0)
     pwm_rvs.duty(0)
     loop.close()
+
+
 
 
 
