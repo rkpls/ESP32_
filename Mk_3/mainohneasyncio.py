@@ -13,14 +13,17 @@ import sh1106
 
 # ---------- CHANGABLE VARS ----------
 
-ssid = 'Zenbook-14-Pals'
-password = 'Micropython'
+ssid = 'Fritz!Box 7430 D'
+password = '55913211915461630311'
+
+#ssid = 'Zenbook-14-Pals'
+#password = 'Micropython'
+
 wlan = network.WLAN(network.STA_IF)
 MQTT_SERVER = '192.168.137.1'
 CLIENT_ID = hexlify(unique_id())
-MQTT_TOPIC = 'adler/data/*'
-MQTT_RECEIVE_TOPIC = 'adler/status/#'
-client = MQTTClient(CLIENT_ID, MQTT_SERVER)
+MQTT_TOPIC = 'adler/data'
+MQTT_RECEIVE_TOPIC = 'adler/status'
 
 # ---------- DATA ----------
 volts = float(0.00)
@@ -47,6 +50,8 @@ x_gees = 0
 passed_moni = ticks_ms()
 passed_oled1 = ticks_ms()
 passed_oled2 = ticks_ms()
+last_calc = ticks_ms()
+current_calc = ticks_ms()
 
 # ---------- PINS ----------
 Volt_Pin = ADC(Pin(4))                      #0.2V per V
@@ -73,7 +78,7 @@ pwm_rvs.duty(0)
 pwm_freq = 1000
 pwm_fwd.freq(pwm_freq)
 pwm_rvs.freq(pwm_freq)
-kp = 0.5
+kp = 0.05
 ki = 0.1
 kd = 0.2
 setpoint_rpm = 1000
@@ -107,17 +112,12 @@ def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
-        print('connecting')
+        print('Verbinde')
         wlan.connect(ssid, password)
         while not wlan.isconnected():
             pass
     print(wlan.ifconfig())
     return wlan
-
-def mqtt_callback(topic, msg):
-    global status
-    print("Received MQTT message:", msg.decode())
-    status = True
 
 def average(values):
     if len(values) > 0:
@@ -128,14 +128,6 @@ def average(values):
 def interrupt_handler_rpm(pin):
     global revcounter
     revcounter += 1
-    
-def mqtt_connect():
-    try:
-        client.connect()
-    except:
-        pass
-    client.set_callback(mqtt_callback)
-    client.subscribe(MQTT_RECEIVE_TOPIC)
 
 class PIDController:
     def __init__(self, kp, ki, kd, setpoint):
@@ -157,73 +149,98 @@ class PIDController:
 pid = PIDController(kp, ki, kd, setpoint_rpm)
 
 # ---------- THREAD DEF ----------
-def system_check():
-    global system
-    if volts < 8 or amps > 10:
-        system = False
-        print("overcurrent protection")
-    else:
-        system = True
-
 def monitoring_send(server = MQTT_SERVER):
-    global client, passed_moni , CLIENT_ID, MQTT_SERVER, MQTT_TOPIC, x_gees, volts, amps, rpm
+    global client, passed_moni , MQTT_TOPIC, x_gees, volts, amps, rpm
     data = {'Volt:': str(volts),
             'Amps': str(amps),
-            'Rpm': str(rpm),
+            'Rpm': int(rpm),
             'Accelx': str(x_gees),
-            'DistT': str(dist_top),
-            'DistF': str(dist_front)}
+            'DistT': int(dist_top),
+            'DistF': int(dist_front)}
     dump = json.dumps(data)
-    client.publish(MQTT_TOPIC, dump)
-        
+    try:
+        client.publish(MQTT_TOPIC, dump)
+    except:
+        pass
+
+def mqtt_callback(topic, msg):
+    global status
+    print('Start')
+    status != status
+
 def abfahrt():
-    global status, target_rpm, anfahrt_aktiv, durchfahrt_aktiv, bremsung_aktiv, ende
+    global duty, dist_top, dist_front, status, dtarget_rpm, anfahrt_aktiv, durchfahrt_aktiv, bremsung_aktiv
     if status == True:
-        status = False
         anfahrt_aktiv = True
-    if anfahrt_aktiv == True:
-        target_rpm = 600
-    if anfahrt_aktiv == True and dist_top < 200:
+        
+    if anfahrt_aktiv == True and dist_top >= 200:
+        duty = 500
+        
+    if anfahrt_aktiv == True and dist_top <= 200:
         anfahrt_aktiv = False
         durchfahrt_aktiv = True
-    if  durchfahrt_aktiv == True:
-        if dist_front > 100:
-            target_rpm = 800
-        if dist_front <= 100:
-            target_rpm = 400
-    if durchfahrt_aktiv == True and dist_top > 200:
+        
+    if  durchfahrt_aktiv == True and dist_top <= 200:
+        if dist_front >= 350:
+            target_rpm = 4000
+        if dist_front <= 350:
+            target_rpm = 2000
+            
+    if durchfahrt_aktiv == True and dist_top >= 200:
         durchfahrt_aktiv = False
-        bremsung_aktiv = True       
+        bremsung_aktiv = True
+        
     if  bremsung_aktiv == True:
-        target_rpm = 0
-    if bremsung_aktiv == True and rpm == 0 and x_gees <= 0.01:
+        duty = 0
+        
+    if bremsung_aktiv == True and rpm == 0 and x_gees <= 0.1:
         bremsung_aktiv = False
         status = False
 
 def sensors():
-    global rpm, dist_top, dist_front, x_gees, volts, amps
     try:
-        rpm = round(float(revcounter / 24 * 52 / 13 / 1 * 60),1)
+        global rpm, dist_top, dist_front, x_gees, volts, amps, revcounter, current_calc, last_calc
+        current_calc = ticks_ms()
+        rpm = int(revcounter * 1.03846 * 1000 / ticks_diff(current_calc, last_calc) * 60)                #(gear1, gear2, magnets,) -> 1sec / miliseconds diff -> min, 
+        last_calc = current_calc
+        revcounter = 0
+    except:
+        pass
+    try:
         dist_top_values.append(int(tof_top.read()))
-        if len(dist_top_values) > 3:
+        if len(dist_top_values) > 10:
             dist_top_values.pop(0)
         dist_top = average(dist_top_values)
+    except:
+        pass
+    try:    
         dist_front_values.append(int(tof_front.read()))
-        if len(dist_front_values) > 3:
+        if len(dist_front_values) > 10:
             dist_front_values.pop(0)
         dist_front = average(dist_front_values)
         x_gees = float(round(imu.accel.x, 1))
+    except:
+        pass
+    try:
         v_read = int(Volt_Pin.read())
         volts = round(v_read * 5 / (4069/3.3), 1)
         a_read = int(Amps_Pin.read() )
         amps = round(a_read / 10 / (4069/3.3), 2)
     except:
-        print("Sensor Error")
+        pass
 
 def motor_control():
-    global pwm_output
+    global pwm_output, duty
+    
     pwm_output = pid.compute(rpm)
     duty = int(pwm_output)
+    if duty >= 1000:
+        duty = 1000
+    if duty >= 1 and duty <= 400:
+        duty = 400
+    if duty <= 0:
+        duty = 0
+    
     pwm_fwd.duty(duty)
     pwm_rvs.duty(0)
 
@@ -231,7 +248,7 @@ def display1():
     global passed_oled1
     time = ticks_ms()
     interval = 500
-    if (ticks_diff(time, passed_oled1) > interval) and (anfahrt_aktiv == False or durchfahrt_aktiv == False or bremsung_aktiv == False):
+    if (ticks_diff(time, passed_oled1) > interval):
         oled1.fill(0)
         oled1.text("Adler Sensoren", 0, 0, 1)
         oled1.text("Oben:", 0, 16, 1)
@@ -250,7 +267,7 @@ def display2():
     global passed_oled2
     time = ticks_ms()
     interval = 500
-    if (ticks_diff(time, passed_oled2) > interval) and (anfahrt_aktiv == False or durchfahrt_aktiv == False or bremsung_aktiv == False):
+    if (ticks_diff(time, passed_oled2) > interval):
         oled2.fill(0)
         oled2.text("Adler Ueberwachung", 0, 0, 1)
         oled2.text("Spannung:", 0, 16, 1)
@@ -270,25 +287,31 @@ def display2():
 connect_wifi()
 gc.enable()
 rpm_pin_14.irq(trigger=Pin.IRQ_FALLING, handler=interrupt_handler_rpm)
-mqtt_connect()
+client = MQTTClient(CLIENT_ID, MQTT_SERVER)
+client.set_callback(mqtt_callback)
+client.connect()
+client.subscribe(MQTT_RECEIVE_TOPIC)
+pwm_fwd.duty(0)
 
 # ---------- LOOP ----------
-try:
-    while status == False:
-        sensors()
-        system_check()
-        display1()
-        display2()
-        mqtt_callback()
-        monitoring_send()
-    while status == True:
-        sensors()
-        system_check()
-        abfahrt()
-        motor_control()
-        sensors()
-        monitoring_send()
-except:
-    pwm_fwd.duty(0)
-    pwm_rvs.duty(0)
-    reset()
+while status == False:
+    sensors()
+    display1()
+    sensors()
+    display2()
+    client.check_msg()
+    monitoring_send()
+while status == True:
+    sensors()
+    abfahrt()
+    sensors()
+    motor_control()
+    sensors()
+    client.check_msg()
+    client.disconnect()
+    client.connect()
+    monitoring_send()
+while True:
+    sleep_ms(1000)
+    
+    

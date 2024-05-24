@@ -15,7 +15,7 @@ pwm_rvs.freq(200)
 time.sleep(1)
 
 pwm_rvs.duty(0)
-pwm_fwd.duty(600)
+pwm_fwd.duty(400)
 
 time.sleep(1)
 
@@ -24,7 +24,7 @@ pwm_fwd.duty(0)
 
 time.sleep(1)
 
-pwm_rvs.duty(600)
+pwm_rvs.duty(400)
 pwm_fwd.duty(0)
 
 time.sleep(1)
@@ -34,4 +34,4 @@ pwm_fwd.duty(0)
 
 time.sleep(1)
 
-import testfahrt2
+#import testfahrt2
