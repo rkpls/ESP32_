@@ -16,17 +16,13 @@ import sh1106
 loop = asyncio.get_event_loop()
 # ---------- CHANGABLE VARS ----------
 
-#ssid = 'Zenbook-14-Pals'
-#password = 'Micropython'
-#MQTT_SERVER = '192.168.137.1'
-
 wlan = network.WLAN(network.STA_IF)
 CLIENT_ID = hexlify(unique_id())
 MQTT_TOPIC = 'adler/data'
 MQTT_RECEIVE_TOPIC = 'adler/status'
 
-ssid = 'DAVE'
-password = '1234567890'
+ssid = '***'
+password = '***'
 MQTT_SERVER = '192.168.137.1'
 
 # ---------- DATA ----------
