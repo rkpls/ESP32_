@@ -9,8 +9,8 @@ from umqtt.simple import MQTTClient
 import json
 
 
-ssid = 'Telekom_Pals'                                           #Schulwlan
-password = 'fck_afd!'
+ssid = '***'                                           #Schulwlan
+password = '***'
 wlan = network.WLAN(network.STA_IF)
 
 MQTT_SERVER = '192.168.2.45'
