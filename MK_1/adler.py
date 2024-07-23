@@ -12,8 +12,8 @@ import sh1106
 loop = asyncio.get_event_loop()
 # ---------- CHANGABLE VARS ----------
 
-ssid = 'Zenbook-14-Pals'
-password = 'Micropython'
+ssid = '***'
+password = '***'
 wlan = network.WLAN(network.STA_IF)
 
 system_check = 10
