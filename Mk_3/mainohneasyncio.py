@@ -13,11 +13,8 @@ import sh1106
 
 # ---------- CHANGABLE VARS ----------
 
-ssid = 'Fritz!Box 7430 D'
-password = '55913211915461630311'
-
-#ssid = 'Zenbook-14-Pals'
-#password = 'Micropython'
+ssid = '***'
+password = '***'
 
 wlan = network.WLAN(network.STA_IF)
 MQTT_SERVER = '192.168.137.1'
