@@ -16,8 +16,8 @@ import sh1106
 loop = asyncio.get_event_loop()
 # ---------- CHANGABLE VARS ----------
 
-ssid = 'Zenbook-14-Pals'
-password = 'Micropython'
+ssid = '***'
+password = '***'
 wlan = network.WLAN(network.STA_IF)
 MQTT_SERVER = '192.168.137.1'
 CLIENT_ID = hexlify(unique_id())
